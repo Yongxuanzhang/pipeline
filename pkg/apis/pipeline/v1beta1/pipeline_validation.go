@@ -340,6 +340,12 @@ func validatePipelineResults(results []PipelineResult) (errs *apis.FieldError) {
 				}
 			}
 		}
+		// Validate the result type
+		if result.Type != "" {
+			if _, ok := AllResultsTypes[result.Type]; !ok{
+				return apis.ErrInvalidValue(result.Type, fmt.Sprintf("%s.type", result.Name))
+			}
+		}
 	}
 
 	return errs

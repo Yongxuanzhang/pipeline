@@ -39,4 +39,15 @@ func (ts *TaskSpec) SetDefaults(ctx context.Context) {
 		ctx = addContextParamSpec(ctx, ts.Params)
 		ts.Params = getContextParamSpecs(ctx)
 	}
+	for i := range ts.Results {
+		ts.Results[i].SetDefaults(ctx)
+	}
+}
+
+// SetDefaults set the default type for TaskResult
+func (tr *TaskResult) SetDefaults(ctx context.Context) {
+	if tr != nil && tr.Type == "" {
+		// ResultsTypeString is the default value
+		tr.Type = ResultsTypeString
+	}
 }

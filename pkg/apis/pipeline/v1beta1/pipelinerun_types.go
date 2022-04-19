@@ -438,6 +438,10 @@ type PipelineRunResult struct {
 	// Name is the result's name as declared by the Pipeline
 	Name string `json:"name"`
 
+	// Type is the user-specified type of the result. The possible type
+	// is currently "string" and will support "array" in following work.
+	Type ResultsType `json:"type,omitempty"`
+
 	// Value is the result returned from the execution of this PipelineRun
 	Value string `json:"value"`
 }

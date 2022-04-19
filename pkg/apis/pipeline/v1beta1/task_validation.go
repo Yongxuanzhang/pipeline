@@ -82,6 +82,12 @@ func (tr TaskResult) Validate(_ context.Context) *apis.FieldError {
 	if !resultNameFormatRegex.MatchString(tr.Name) {
 		return apis.ErrInvalidKeyName(tr.Name, "name", fmt.Sprintf("Name must consist of alphanumeric characters, '-', '_', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my-name',  or 'my_name', regex used for validation is '%s')", ResultNameFormat))
 	}
+	// Validate the result type
+	if tr.Type != "" {
+		if _, ok := AllResultsTypes[tr.Type]; !ok{
+			return apis.ErrInvalidValue(tr.Type, fmt.Sprintf("%s.type", tr.Name))
+		}
+	}
 	return nil
 }
 

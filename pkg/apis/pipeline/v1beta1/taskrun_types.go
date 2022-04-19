@@ -214,6 +214,11 @@ type TaskRunResult struct {
 	// Name the given name
 	Name string `json:"name"`
 
+	// Type is the user-specified type of the result. The possible type
+	// is currently "string" and will support "array" in following work.
+	// +optional
+	Type ParamType `json:"type,omitempty"`
+
 	// Value the given value of the result
 	Value string `json:"value"`
 }

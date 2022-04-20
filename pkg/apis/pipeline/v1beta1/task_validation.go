@@ -85,7 +85,7 @@ func (tr TaskResult) Validate(_ context.Context) *apis.FieldError {
 	// Validate the result type
 	if tr.Type != "" {
 		if _, ok := AllResultsTypes[tr.Type]; !ok{
-			return apis.ErrInvalidValue(tr.Type, fmt.Sprintf("%s.type", tr.Name))
+			return apis.ErrInvalidValue(tr.Type, "type", fmt.Sprintf("type must be string"))
 		}
 	}
 	return nil

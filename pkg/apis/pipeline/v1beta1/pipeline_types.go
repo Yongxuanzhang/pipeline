@@ -116,10 +116,6 @@ type PipelineResult struct {
 	// Name the given name
 	Name string `json:"name"`
 
-	// Type is the user-specified type of the result. The possible type
-	// is currently "string" and will support "array" in following work.
-	Type ResultsType `json:"type,omitempty"`
-
 	// Description is a human-readable description of the result
 	// +optional
 	Description string `json:"description"`

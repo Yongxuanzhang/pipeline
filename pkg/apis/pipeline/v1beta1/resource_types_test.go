@@ -154,16 +154,20 @@ func TestPipelineResourceResult_UnmarshalJSON(t *testing.T) {
 	}{{
 		name: "type defined as string - TaskRunResult",
 		data: "{\"key\":\"resultName\",\"value\":\"resultValue\", \"type\": \"TaskRunResult\"}",
-		pr:   v1beta1.PipelineResourceResult{Key: "resultName", Value: "resultValue", ResultType: v1beta1.TaskRunResultType},
+		pr:   v1beta1.PipelineResourceResult{Key: "resultName", Value: v1beta1.ArrayOrString{StringVal: "resultValue", Type: "string"}, ResultType: v1beta1.TaskRunResultType},
 	},
 		{
 			name: "type defined as string - InternalTektonResult",
 			data: "{\"key\":\"resultName\",\"value\":\"\", \"type\": \"InternalTektonResult\"}",
-			pr:   v1beta1.PipelineResourceResult{Key: "resultName", Value: "", ResultType: v1beta1.InternalTektonResultType},
+			pr:   v1beta1.PipelineResourceResult{Key: "resultName", Value: v1beta1.ArrayOrString{StringVal: "", Type: "string"}, ResultType: v1beta1.InternalTektonResultType},
+		}, {
+			name: "type defined as array - InternalTektonResult",
+			data: "{\"key\":\"resultName\",\"value\":[\"cat\",\"dog\",\"squirrel\"], \"type\": \"InternalTektonResult\"}",
+			pr:   v1beta1.PipelineResourceResult{Key: "resultName", Value: v1beta1.ArrayOrString{ArrayVal: []string{"cat", "dog", "squirrel"}, Type: "array"}, ResultType: v1beta1.InternalTektonResultType},
 		}, {
 			name: "type defined as int",
 			data: "{\"key\":\"resultName\",\"value\":\"\", \"type\": 1}",
-			pr:   v1beta1.PipelineResourceResult{Key: "resultName", Value: "", ResultType: v1beta1.TaskRunResultType},
+			pr:   v1beta1.PipelineResourceResult{Key: "resultName", Value: v1beta1.ArrayOrString{StringVal: "", Type: "string"}, ResultType: v1beta1.TaskRunResultType},
 		}}
 
 	for _, tc := range testcases {

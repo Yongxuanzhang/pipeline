@@ -34,10 +34,10 @@ func TestParseMessage(t *testing.T) {
 		msg:  `[{"key": "digest","value":"hereisthedigest"},{"key":"foo","value":"bar"}]`,
 		want: []v1beta1.PipelineResourceResult{{
 			Key:   "digest",
-			Value: "hereisthedigest",
+			Value: *v1beta1.NewArrayOrString("hereisthedigest"),
 		}, {
 			Key:   "foo",
-			Value: "bar",
+			Value: *v1beta1.NewArrayOrString("bar"),
 		}},
 	}, {
 		desc: "empty message",
@@ -51,7 +51,7 @@ func TestParseMessage(t *testing.T) {
 		{"key":"foo","value":"last"}]`,
 		want: []v1beta1.PipelineResourceResult{{
 			Key:   "foo",
-			Value: "last",
+			Value: *v1beta1.NewArrayOrString("last"),
 		}},
 	}, {
 		desc: "sorted by key",
@@ -61,13 +61,13 @@ func TestParseMessage(t *testing.T) {
 		{"key":"aaa","value":"first"}]`,
 		want: []v1beta1.PipelineResourceResult{{
 			Key:   "aaa",
-			Value: "first",
+			Value: *v1beta1.NewArrayOrString("first"),
 		}, {
 			Key:   "ddd",
-			Value: "middle",
+			Value: *v1beta1.NewArrayOrString("middle"),
 		}, {
 			Key:   "zzz",
-			Value: "last",
+			Value: *v1beta1.NewArrayOrString("last"),
 		}},
 	}} {
 		t.Run(c.desc, func(t *testing.T) {

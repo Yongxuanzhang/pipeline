@@ -241,7 +241,7 @@ type TaskRunResult struct {
 	Name string `json:"name"`
 
 	// Value the given value of the result
-	Value string `json:"value"`
+	Value ArrayOrString `json:"value"`
 }
 
 // TaskRunStepOverride is used to override the values of a Step in the corresponding Task.

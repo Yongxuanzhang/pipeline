@@ -43,7 +43,7 @@ func TestExistingFile(t *testing.T) {
 	}()
 	output := []v1beta1.PipelineResourceResult{{
 		Key:   "key1",
-		Value: "hello",
+		Value: *v1beta1.NewArrayOrString("hello"),
 	}}
 
 	if err := WriteMessage(tmpFile.Name(), output); err != nil {
@@ -52,7 +52,7 @@ func TestExistingFile(t *testing.T) {
 
 	output = []v1beta1.PipelineResourceResult{{
 		Key:   "key2",
-		Value: "world",
+		Value: *v1beta1.NewArrayOrString("world"),
 	}}
 
 	if err := WriteMessage(tmpFile.Name(), output); err != nil {
@@ -80,7 +80,7 @@ func TestMaxSizeFile(t *testing.T) {
 
 	output := []v1beta1.PipelineResourceResult{{
 		Key:   "key1",
-		Value: value,
+		Value: *v1beta1.NewArrayOrString(value),
 	}}
 
 	if err := WriteMessage(tmpFile.Name(), output); !errors.Is(err, aboveMax) {

@@ -62,7 +62,7 @@ func main() {
 	output := []v1beta1.PipelineResourceResult{
 		{
 			Key:   "commit",
-			Value: commit,
+			Value: *v1beta1.NewArrayOrString(commit),
 			ResourceRef: &v1beta1.PipelineResourceRef{
 				Name: resourceName,
 			},
@@ -70,7 +70,7 @@ func main() {
 		},
 		{
 			Key:   "url",
-			Value: fetchSpec.URL,
+			Value: *v1beta1.NewArrayOrString(fetchSpec.URL),
 			ResourceRef: &v1beta1.PipelineResourceRef{
 				Name: resourceName,
 			},

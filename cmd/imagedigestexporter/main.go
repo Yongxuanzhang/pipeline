@@ -65,7 +65,7 @@ func main() {
 		}
 		output = append(output, v1beta1.PipelineResourceResult{
 			Key:          "digest",
-			Value:        digest.String(),
+			Value:        *v1beta1.NewArrayOrString(digest.String()),
 			ResourceName: imageResource.Name,
 			ResourceRef: &v1beta1.PipelineResourceRef{
 				Name: imageResource.Name,
@@ -73,7 +73,7 @@ func main() {
 		})
 		output = append(output, v1beta1.PipelineResourceResult{
 			Key:          "url",
-			Value:        imageResource.URL,
+			Value:        *v1beta1.NewArrayOrString(imageResource.URL),
 			ResourceName: imageResource.Name,
 			ResourceRef: &v1beta1.PipelineResourceRef{
 				Name: imageResource.Name,

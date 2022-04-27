@@ -147,7 +147,6 @@ func setTaskRunStatusBasedOnStepStatus(logger *zap.SugaredLogger, stepStatuses [
 	for _, s := range stepStatuses {
 		if s.State.Terminated != nil && len(s.State.Terminated.Message) != 0 {
 			msg := s.State.Terminated.Message
-
 			results, err := termination.ParseMessage(logger, msg)
 			if err != nil {
 				logger.Errorf("termination message could not be parsed as JSON: %v", err)
@@ -228,6 +227,7 @@ func filterResultsAndResources(results []v1beta1.PipelineResourceResult) ([]v1be
 				Name:  r.Key,
 				Value: r.Value,
 			}
+			//TODO(yongxuanzhang): validate r.value against results.type schema
 			taskResults = append(taskResults, taskRunResult)
 			filteredResults = append(filteredResults, r)
 		case v1beta1.InternalTektonResultType:
@@ -266,7 +266,7 @@ func removeDuplicateResults(taskRunResult []v1beta1.TaskRunResult) []v1beta1.Tas
 func extractStartedAtTimeFromResults(results []v1beta1.PipelineResourceResult) (*metav1.Time, error) {
 	for _, result := range results {
 		if result.Key == "StartedAt" {
-			t, err := time.Parse(timeFormat, result.Value)
+			t, err := time.Parse(timeFormat, result.Value.StringVal)
 			if err != nil {
 				return nil, fmt.Errorf("could not parse time value %q in StartedAt field: %w", result.Value, err)
 			}
@@ -281,7 +281,7 @@ func extractExitCodeFromResults(results []v1beta1.PipelineResourceResult) (*int3
 	for _, result := range results {
 		if result.Key == "ExitCode" {
 			// We could just pass the string through but this provides extra validation
-			i, err := strconv.ParseUint(result.Value, 10, 32)
+			i, err := strconv.ParseUint(result.Value.StringVal, 10, 32)
 			if err != nil {
 				return nil, fmt.Errorf("could not parse int value %q in ExitCode field: %w", result.Value, err)
 			}
@@ -353,7 +353,7 @@ func getFailureMessage(logger *zap.SugaredLogger, pod *corev1.Pod) string {
 			msg := status.State.Terminated.Message
 			r, _ := termination.ParseMessage(logger, msg)
 			for _, result := range r {
-				if result.ResultType == v1beta1.InternalTektonResultType && result.Key == "Reason" && result.Value == "TimeoutExceeded" {
+				if result.ResultType == v1beta1.InternalTektonResultType && result.Key == "Reason" && result.Value.StringVal == "TimeoutExceeded" {
 					// Newline required at end to prevent yaml parser from breaking the log help text at 80 chars
 					return fmt.Sprintf("%q exited because the step exceeded the specified timeout limit; for logs run: kubectl -n %s logs %s -c %s\n",
 						status.Name,

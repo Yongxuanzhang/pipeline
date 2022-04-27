@@ -534,7 +534,7 @@ func TestMakeTaskRunStatus(t *testing.T) {
 				Sidecars: []v1beta1.SidecarState{},
 				ResourcesResult: []v1beta1.PipelineResourceResult{{
 					Key:         "digest",
-					Value:       "sha256:12345",
+					Value:       *v1beta1.NewArrayOrString("sha256:12345"),
 					ResourceRef: &v1beta1.PipelineResourceRef{Name: "source-image"},
 				}},
 				// We don't actually care about the time, just that it's not nil
@@ -568,12 +568,12 @@ func TestMakeTaskRunStatus(t *testing.T) {
 				Sidecars: []v1beta1.SidecarState{},
 				ResourcesResult: []v1beta1.PipelineResourceResult{{
 					Key:         "digest",
-					Value:       "sha256:1234",
+					Value:       *v1beta1.NewArrayOrString("sha256:1234"),
 					ResourceRef: &v1beta1.PipelineResourceRef{Name: "source-image"},
 				}},
 				TaskRunResults: []v1beta1.TaskRunResult{{
 					Name:  "resultName",
-					Value: "resultValue",
+					Value: *v1beta1.NewArrayOrString("resultValue"),
 				}},
 				// We don't actually care about the time, just that it's not nil
 				CompletionTime: &metav1.Time{Time: time.Now()},
@@ -606,12 +606,12 @@ func TestMakeTaskRunStatus(t *testing.T) {
 				Sidecars: []v1beta1.SidecarState{},
 				ResourcesResult: []v1beta1.PipelineResourceResult{{
 					Key:         "digest",
-					Value:       "sha256:1234",
+					Value:       *v1beta1.NewArrayOrString("sha256:1234"),
 					ResourceRef: &v1beta1.PipelineResourceRef{Name: "source-image"},
 				}},
 				TaskRunResults: []v1beta1.TaskRunResult{{
 					Name:  "resultName",
-					Value: "resultValue",
+					Value: *v1beta1.NewArrayOrString("resultValue"),
 				}},
 				// We don't actually care about the time, just that it's not nil
 				CompletionTime: &metav1.Time{Time: time.Now()},
@@ -658,10 +658,10 @@ func TestMakeTaskRunStatus(t *testing.T) {
 				Sidecars: []v1beta1.SidecarState{},
 				TaskRunResults: []v1beta1.TaskRunResult{{
 					Name:  "resultNameOne",
-					Value: "resultValueThree",
+					Value: *v1beta1.NewArrayOrString("resultValueThree"),
 				}, {
 					Name:  "resultNameTwo",
-					Value: "resultValueTwo",
+					Value: *v1beta1.NewArrayOrString("resultValueTwo"),
 				}},
 				// We don't actually care about the time, just that it's not nil
 				CompletionTime: &metav1.Time{Time: time.Now()},
@@ -745,12 +745,12 @@ func TestMakeTaskRunStatus(t *testing.T) {
 				Sidecars: []v1beta1.SidecarState{},
 				ResourcesResult: []v1beta1.PipelineResourceResult{{
 					Key:        "resultNameOne",
-					Value:      "",
+					Value:      *v1beta1.NewArrayOrString(""),
 					ResultType: v1beta1.PipelineResourceResultType,
 				}},
 				TaskRunResults: []v1beta1.TaskRunResult{{
 					Name:  "resultNameThree",
-					Value: "",
+					Value: *v1beta1.NewArrayOrString(""),
 				}},
 				// We don't actually care about the time, just that it's not nil
 				CompletionTime: &metav1.Time{Time: time.Now()},
@@ -783,12 +783,12 @@ func TestMakeTaskRunStatus(t *testing.T) {
 				Sidecars: []v1beta1.SidecarState{},
 				ResourcesResult: []v1beta1.PipelineResourceResult{{
 					Key:        "resultNameOne",
-					Value:      "",
+					Value:      *v1beta1.NewArrayOrString(""),
 					ResultType: v1beta1.PipelineResourceResultType,
 				}},
 				TaskRunResults: []v1beta1.TaskRunResult{{
 					Name:  "resultNameThree",
-					Value: "",
+					Value: *v1beta1.NewArrayOrString(""),
 				}},
 				// We don't actually care about the time, just that it's not nil
 				CompletionTime: &metav1.Time{Time: time.Now()},

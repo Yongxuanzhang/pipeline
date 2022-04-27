@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/google/go-cmp/cmp"
 	v1beta1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	"go.uber.org/zap"
 )
@@ -38,9 +39,8 @@ func ParseMessage(logger *zap.SugaredLogger, msg string) ([]v1beta1.PipelineReso
 	if err := json.Unmarshal([]byte(msg), &r); err != nil {
 		return nil, fmt.Errorf("parsing message json: %v", err)
 	}
-
 	for i, rr := range r {
-		if rr == (v1beta1.PipelineResourceResult{}) {
+		if cmp.Equal(rr, v1beta1.PipelineResourceResult{}) {
 			// Erase incorrect result
 			r[i] = r[len(r)-1]
 			r = r[:len(r)-1]

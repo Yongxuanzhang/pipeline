@@ -176,7 +176,7 @@ func findTaskResultForParam(taskRun *v1beta1.TaskRun, reference *v1beta1.ResultR
 	results := taskRun.Status.TaskRunStatusFields.TaskRunResults
 	for _, result := range results {
 		if result.Name == reference.Result {
-			return result.Value, nil
+			return result.Value.StringVal, nil
 		}
 	}
 	return "", fmt.Errorf("Could not find result with name %s for task %s", reference.Result, reference.PipelineTask)

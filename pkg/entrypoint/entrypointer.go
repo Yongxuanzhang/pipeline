@@ -18,6 +18,7 @@ package entrypoint
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -123,7 +124,7 @@ func (e Entrypointer) Go() error {
 			}
 			output = append(output, v1beta1.PipelineResourceResult{
 				Key:        "StartedAt",
-				Value:      time.Now().Format(timeFormat),
+				Value:      *v1beta1.NewArrayOrString(time.Now().Format(timeFormat)),
 				ResultType: v1beta1.InternalTektonResultType,
 			})
 			return err
@@ -132,7 +133,7 @@ func (e Entrypointer) Go() error {
 
 	output = append(output, v1beta1.PipelineResourceResult{
 		Key:        "StartedAt",
-		Value:      time.Now().Format(timeFormat),
+		Value:      *v1beta1.NewArrayOrString(time.Now().Format(timeFormat)),
 		ResultType: v1beta1.InternalTektonResultType,
 	})
 
@@ -152,7 +153,7 @@ func (e Entrypointer) Go() error {
 		if err == context.DeadlineExceeded {
 			output = append(output, v1beta1.PipelineResourceResult{
 				Key:        "Reason",
-				Value:      "TimeoutExceeded",
+				Value:      *v1beta1.NewArrayOrString("TimeoutExceeded"),
 				ResultType: v1beta1.InternalTektonResultType,
 			})
 		}
@@ -167,7 +168,7 @@ func (e Entrypointer) Go() error {
 		exitCode := strconv.Itoa(ee.ExitCode())
 		output = append(output, v1beta1.PipelineResourceResult{
 			Key:        "ExitCode",
-			Value:      exitCode,
+			Value:      *v1beta1.NewArrayOrString("exitCode"),
 			ResultType: v1beta1.InternalTektonResultType,
 		})
 		e.WritePostFile(e.PostFile, nil)
@@ -204,10 +205,26 @@ func (e Entrypointer) readResultsFromDisk() error {
 		} else if err != nil {
 			return err
 		}
+
+		as := v1beta1.ArrayOrString{}
+		if fileContents[0] == '"' {
+			err = json.Unmarshal(fileContents, &as.StringVal)
+			if err != nil {
+				return err
+			}
+			as.Type = "string"
+		}
+		if fileContents[0] == '[' {
+			err = json.Unmarshal(fileContents, &as.ArrayVal)
+			if err != nil {
+				return err
+			}
+			as.Type = "array"
+		}
 		// if the file doesn't exist, ignore it
 		output = append(output, v1beta1.PipelineResourceResult{
-			Key:        resultFile,
-			Value:      string(fileContents),
+			Key:   resultFile,
+			Value: as,
 			ResultType: v1beta1.TaskRunResultType,
 		})
 	}

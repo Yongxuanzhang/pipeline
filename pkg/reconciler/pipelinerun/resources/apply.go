@@ -98,14 +98,6 @@ func ApplyPipelineTaskContexts(pt *v1beta1.PipelineTask) *v1beta1.PipelineTask {
 
 // ApplyTaskResults applies the ResolvedResultRef to each PipelineTask.Params and Pipeline.WhenExpressions in targets
 func ApplyTaskResults(targets PipelineRunState, resolvedResultRefs ResolvedResultRefs) {
-	fmt.Println("!!!ApplyTaskResults targets",targets)
-	if len(targets)>0{
-		fmt.Println("!!!ApplyTaskResults targets[0]",targets[0])
-	}
-	fmt.Println("!!!ApplyTaskResults resolvedResultRefs",resolvedResultRefs)
-	if len(resolvedResultRefs)>0{
-		fmt.Println("!!!ApplyTaskResults resolvedResultRefs[0]",resolvedResultRefs[0])
-	}
 	stringReplacements := resolvedResultRefs.getStringReplacements()
 	for _, resolvedPipelineRunTask := range targets {
 		// also make substitution for resolved condition checks
@@ -229,7 +221,6 @@ func ApplyTaskResultsToPipelineResults(
 			})
 		}
 	}
-	fmt.Println("!!!ApplyTaskResultsToPipelineResults runResults", runResults)
 	return runResults
 }
 

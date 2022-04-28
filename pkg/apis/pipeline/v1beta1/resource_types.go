@@ -128,9 +128,9 @@ type PipelineResourceBinding struct {
 
 // PipelineResourceResult used to export the image name and digest as json
 type PipelineResourceResult struct {
-	Key          string `json:"key"`
+	Key          string        `json:"key"`
 	Value        ArrayOrString `json:"value"`
-	ResourceName string `json:"resourceName,omitempty"`
+	ResourceName string        `json:"resourceName,omitempty"`
 	// The field ResourceRef should be deprecated and removed in the next API version.
 	// See https://github.com/tektoncd/pipeline/issues/2694 for more information.
 	ResourceRef *PipelineResourceRef `json:"resourceRef,omitempty"`

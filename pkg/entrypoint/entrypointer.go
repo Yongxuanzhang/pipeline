@@ -18,7 +18,6 @@ package entrypoint
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -206,25 +205,16 @@ func (e Entrypointer) readResultsFromDisk() error {
 			return err
 		}
 
-		as := v1beta1.ArrayOrString{}
-		if fileContents[0] == '"' {
-			err = json.Unmarshal(fileContents, &as.StringVal)
-			if err != nil {
-				return err
-			}
-			as.Type = "string"
+		// unmarshal the filesContents to string or array
+		aos := v1beta1.ArrayOrString{}
+		if err := aos.UnmarshalJSON(fileContents);err!=nil{
+			return err
 		}
-		if fileContents[0] == '[' {
-			err = json.Unmarshal(fileContents, &as.ArrayVal)
-			if err != nil {
-				return err
-			}
-			as.Type = "array"
-		}
+
 		// if the file doesn't exist, ignore it
 		output = append(output, v1beta1.PipelineResourceResult{
 			Key:   resultFile,
-			Value: as,
+			Value: aos,
 			ResultType: v1beta1.TaskRunResultType,
 		})
 	}

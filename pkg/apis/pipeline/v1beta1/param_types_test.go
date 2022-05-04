@@ -171,6 +171,9 @@ func TestArrayOrString_UnmarshalJSON(t *testing.T) {
 		input  string
 		result v1beta1.ArrayOrString
 	}{
+		{"{\"val\": 123}", *v1beta1.NewArrayOrString("123")},
+		{"{\"val\": [1,2,3]}", *v1beta1.NewArrayOrString("[1,2,3]")},
+		{"{\"val\": [1,\"2\",3]}", *v1beta1.NewArrayOrString("[1,\"2\",3]")},
 		{"{\"val\": \"123\"}", *v1beta1.NewArrayOrString("123")},
 		{"{\"val\": \"\"}", *v1beta1.NewArrayOrString("")},
 		{"{\"val\":[]}", v1beta1.ArrayOrString{Type: v1beta1.ParamTypeArray, ArrayVal: []string{}}},
@@ -185,6 +188,23 @@ func TestArrayOrString_UnmarshalJSON(t *testing.T) {
 		}
 		if !reflect.DeepEqual(result.AOrS, c.result) {
 			t.Errorf("Failed to unmarshal input '%v': expected %+v, got %+v", c.input, c.result, result)
+		}
+	}
+}
+
+func TestArrayOrString_UnmarshalJSON_Error(t *testing.T) {
+	cases := []struct {
+		desc  string
+		input string
+	}{
+		{desc: "empty value", input: "{\"val\": }"},
+		{desc: "wrong beginning value", input: "{\"val\": @}"},
+	}
+
+	for _, c := range cases {
+		var result ArrayOrStringHolder
+		if err := json.Unmarshal([]byte(c.input), &result); err == nil {
+			t.Errorf("Should return err but got nil '%v'", c.input)
 		}
 	}
 }

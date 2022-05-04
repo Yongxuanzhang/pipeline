@@ -39,7 +39,7 @@ type TaskRunResult struct {
 	Type ResultsType `json:"type,omitempty"`
 
 	// Value the given value of the result
-	Value string `json:"value"`
+	Value ArrayOrString `json:"value"`
 }
 
 // ResultsType indicates the type of a result;

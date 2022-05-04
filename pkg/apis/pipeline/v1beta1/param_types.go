@@ -112,12 +112,28 @@ type ArrayOrString struct {
 
 // UnmarshalJSON implements the json.Unmarshaller interface.
 func (arrayOrString *ArrayOrString) UnmarshalJSON(value []byte) error {
-	if value[0] == '"' {
+	if len(value) == 0 {
 		arrayOrString.Type = ParamTypeString
-		return json.Unmarshal(value, &arrayOrString.StringVal)
+		arrayOrString.StringVal = string(value)
+		arrayOrString.ArrayVal = nil
+		return nil
 	}
-	arrayOrString.Type = ParamTypeArray
-	return json.Unmarshal(value, &arrayOrString.ArrayVal)
+	switch value[0] {
+	case '[':
+		arrayOrString.Type = ParamTypeArray
+		if err := json.Unmarshal(value, &arrayOrString.ArrayVal); err == nil {
+			return nil
+		}
+	case '"':
+		arrayOrString.Type = ParamTypeString
+		if err := json.Unmarshal(value, &arrayOrString.StringVal); err == nil {
+			return nil
+		}
+	}
+	arrayOrString.Type = ParamTypeString
+	arrayOrString.StringVal = string(value)
+	arrayOrString.ArrayVal = nil
+	return nil
 }
 
 // MarshalJSON implements the json.Marshaller interface.

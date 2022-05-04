@@ -3252,7 +3252,7 @@ func TestResolvedPipelineRunTask_IsFinallySkipped(t *testing.T) {
 			TaskRunStatusFields: v1beta1.TaskRunStatusFields{
 				TaskRunResults: []v1beta1.TaskRunResult{{
 					Name:  "commit",
-					Value: "SHA2",
+					Value: *v1beta1.NewArrayOrString("SHA2"),
 				}},
 			},
 		},
@@ -3385,7 +3385,7 @@ func TestResolvedPipelineRunTask_IsFinalTask(t *testing.T) {
 			TaskRunStatusFields: v1beta1.TaskRunStatusFields{
 				TaskRunResults: []v1beta1.TaskRunResult{{
 					Name:  "commit",
-					Value: "SHA2",
+					Value: *v1beta1.NewArrayOrString("SHA2"),
 				}},
 			},
 		},

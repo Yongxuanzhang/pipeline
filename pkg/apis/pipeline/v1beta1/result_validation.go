@@ -33,7 +33,7 @@ func (tr TaskResult) Validate(_ context.Context) *apis.FieldError {
 		}
 	}
 	if !validType {
-		return apis.ErrInvalidValue(tr.Type, "type", fmt.Sprintf("type must be string"))
+		return apis.ErrInvalidValue(tr.Type, "type", fmt.Sprintf("type must be string, array or object"))
 	}
 
 	return nil

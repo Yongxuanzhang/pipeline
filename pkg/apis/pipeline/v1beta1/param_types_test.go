@@ -252,29 +252,6 @@ func TestArrayOrString_UnmarshalJSON_Directly(t *testing.T) {
 	}
 }
 
-func TestArrayOrString_UnmarshalJSON_Directly(t *testing.T) {
-	cases := []struct {
-		desc     string
-		input    string
-		expected v1beta1.ArrayOrString
-	}{
-		{desc: "empty value", input: ``, expected: *v1beta1.NewArrayOrString("")},
-		{desc: "int value", input: `1`, expected: *v1beta1.NewArrayOrString("1")},
-		{desc: "string value", input: `hello`, expected: *v1beta1.NewArrayOrString("hello")},
-		{desc: "array value", input: `["hello","world"]`, expected: *v1beta1.NewArrayOrString("hello", "world")},
-	}
-
-	for _, c := range cases {
-		aos := v1beta1.ArrayOrString{}
-		if err := aos.UnmarshalJSON([]byte(c.input)); err != nil {
-			t.Errorf("Failed to unmarshal input '%v': %v", c.input, err)
-		}
-		if !reflect.DeepEqual(aos, c.expected) {
-			t.Errorf("Failed to unmarshal input '%v': expected %+v, got %+v", c.input, c.expected, aos)
-		}
-	}
-}
-
 func TestArrayOrString_UnmarshalJSON_Error(t *testing.T) {
 	cases := []struct {
 		desc  string

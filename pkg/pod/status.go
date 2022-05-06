@@ -229,6 +229,7 @@ func filterResultsAndResources(ctx context.Context, results []v1beta1.PipelineRe
 			cfg := config.FromContextOrDefaults(ctx)
 			aos := v1beta1.ArrayOrString{}
 			if cfg.FeatureFlags.EnableAPIFields == config.AlphaAPIFields {
+				// Note that for unsupported types such as []int will be Unmarshalled to String
 				err := aos.UnmarshalJSON([]byte(r.Value))
 				if err != nil {
 					continue

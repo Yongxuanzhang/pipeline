@@ -115,7 +115,6 @@ func (arrayOrString *ArrayOrString) UnmarshalJSON(value []byte) error {
 	if len(value) == 0 {
 		arrayOrString.Type = ParamTypeString
 		arrayOrString.StringVal = string(value)
-		arrayOrString.ArrayVal = nil
 		return nil
 	}
 	switch value[0] {

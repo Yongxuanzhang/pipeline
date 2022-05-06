@@ -124,7 +124,7 @@ func (arrayOrString *ArrayOrString) UnmarshalJSON(value []byte) error {
 		if err := json.Unmarshal(value, &arrayOrString.ArrayVal); err == nil {
 			return nil
 		}
-	case '"':
+	default:
 		arrayOrString.Type = ParamTypeString
 		if err := json.Unmarshal(value, &arrayOrString.StringVal); err == nil {
 			return nil

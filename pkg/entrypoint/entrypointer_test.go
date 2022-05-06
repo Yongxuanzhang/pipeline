@@ -324,11 +324,11 @@ func TestReadResultsFromDisk(t *testing.T) {
 			}
 			logger, _ := logging.NewLogger("", "status")
 			got, _ := termination.ParseMessage(logger, string(msg))
-			for _,g :=range got{
+			for _, g := range got {
 				aos := v1beta1.ArrayOrString{}
 				aos.UnmarshalJSON([]byte(g.Value))
-				fmt.Println("g",g)
-				fmt.Println("aos",aos)
+				fmt.Println("g", g)
+				fmt.Println("aos", aos)
 
 			}
 			if d := cmp.Diff(got, c.want); d != "" {

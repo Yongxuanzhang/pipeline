@@ -122,7 +122,8 @@ func (arrayOrString *ArrayOrString) UnmarshalJSON(value []byte) error {
 		arrayOrString.Type = ParamTypeArray
 		// We're tring to Unmarshal to []string, but for cases like []int or other types
 		// of nested array which we don't support yet, we should continue and Unmarshal
-		// it to String.
+		// it to String. If the Type being set doesn't match what it actually should be,
+		// it will be captured somewhere else.
 		if err := json.Unmarshal(value, &arrayOrString.ArrayVal); err == nil {
 			return nil
 		}

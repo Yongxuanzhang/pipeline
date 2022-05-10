@@ -327,9 +327,6 @@ func TestReadResultsFromDisk(t *testing.T) {
 			for _, g := range got {
 				aos := v1beta1.ArrayOrString{}
 				aos.UnmarshalJSON([]byte(g.Value))
-				fmt.Println("g", g)
-				fmt.Println("aos", aos)
-
 			}
 			if d := cmp.Diff(got, c.want); d != "" {
 				t.Fatalf("Diff(-want,+got): %v", d)

@@ -35,7 +35,7 @@ func TestNewResultReference(t *testing.T) {
 		name: "Test valid expression",
 		param: v1beta1.Param{
 			Name:  "param",
-			Value: *v1beta1.NewArrayOrString("$(tasks.sumTask.results.sumResult)"),
+			Value: *v1beta1.NewArrayOrString("$(tasks.sumTask.results.sumResult[0])"),
 		},
 		want: []*v1beta1.ResultRef{{
 			PipelineTask: "sumTask",

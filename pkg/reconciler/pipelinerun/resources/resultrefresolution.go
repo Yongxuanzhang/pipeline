@@ -187,8 +187,17 @@ func findTaskResultForParam(taskRun *v1beta1.TaskRun, reference *v1beta1.ResultR
 func (rs ResolvedResultRefs) getStringReplacements() map[string]string {
 	replacements := map[string]string{}
 	for _, r := range rs {
-		for _, target := range r.getReplaceTarget() {
-			replacements[target] = r.Value.StringVal
+		switch r.Value.Type {
+		case v1beta1.ParamTypeArray:
+			for i := 0; i < len(r.Value.ArrayVal); i++ {
+				for _, target := range r.getReplaceTargetfromArray(i) {
+					replacements[target] = r.Value.ArrayVal[i]
+				}
+			}
+		default:
+			for _, target := range r.getReplaceTarget() {
+				replacements[target] = r.Value.StringVal
+			}
 		}
 	}
 	return replacements
@@ -199,5 +208,13 @@ func (r *ResolvedResultRef) getReplaceTarget() []string {
 		fmt.Sprintf("%s.%s.%s.%s", v1beta1.ResultTaskPart, r.ResultReference.PipelineTask, v1beta1.ResultResultPart, r.ResultReference.Result),
 		fmt.Sprintf("%s.%s.%s[%q]", v1beta1.ResultTaskPart, r.ResultReference.PipelineTask, v1beta1.ResultResultPart, r.ResultReference.Result),
 		fmt.Sprintf("%s.%s.%s['%s']", v1beta1.ResultTaskPart, r.ResultReference.PipelineTask, v1beta1.ResultResultPart, r.ResultReference.Result),
+	}
+}
+
+func (r *ResolvedResultRef) getReplaceTargetfromArray(idx int) []string {
+	return []string{
+		fmt.Sprintf("%s.%s.%s.%s[%d]", v1beta1.ResultTaskPart, r.ResultReference.PipelineTask, v1beta1.ResultResultPart, r.ResultReference.Result, idx),
+		fmt.Sprintf("%s.%s.%s[%q][%d]", v1beta1.ResultTaskPart, r.ResultReference.PipelineTask, v1beta1.ResultResultPart, r.ResultReference.Result, idx),
+		fmt.Sprintf("%s.%s.%s['%s'][%d]", v1beta1.ResultTaskPart, r.ResultReference.PipelineTask, v1beta1.ResultResultPart, r.ResultReference.Result, idx),
 	}
 }

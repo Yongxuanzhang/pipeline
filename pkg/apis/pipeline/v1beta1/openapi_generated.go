@@ -75,6 +75,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1.PipelineTaskRun":                      schema_pkg_apis_pipeline_v1beta1_PipelineTaskRun(ref),
 		"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1.PipelineTaskRunSpec":                  schema_pkg_apis_pipeline_v1beta1_PipelineTaskRunSpec(ref),
 		"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1.PipelineWorkspaceDeclaration":         schema_pkg_apis_pipeline_v1beta1_PipelineWorkspaceDeclaration(ref),
+		"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1.PropertySpec":                         schema_pkg_apis_pipeline_v1beta1_PropertySpec(ref),
 		"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1.ResolverParam":                        schema_pkg_apis_pipeline_v1beta1_ResolverParam(ref),
 		"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1.ResolverRef":                          schema_pkg_apis_pipeline_v1beta1_ResolverRef(ref),
 		"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1.ResultRef":                            schema_pkg_apis_pipeline_v1beta1_ResultRef(ref),
@@ -369,7 +370,7 @@ func schema_pkg_apis_pipeline_v1beta1_ArrayOrString(ref common.ReferenceCallback
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "ArrayOrString is a type that can hold a single string or string array. Used in JSON unmarshalling so that a single JSON field can accept either an individual string or an array of strings.",
+				Description: "ArrayOrString is a type that can hold a single string or string array. Used in JSON unmarshalling so that a single JSON field can accept either an individual string or an array of strings. consideration the object case after the community reaches an agreement on it.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"type": {
@@ -406,8 +407,23 @@ func schema_pkg_apis_pipeline_v1beta1_ArrayOrString(ref common.ReferenceCallback
 							},
 						},
 					},
+					"objectVal": {
+						SchemaProps: spec.SchemaProps{
+							Type: []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
 				},
-				Required: []string{"type", "stringVal", "arrayVal"},
+				Required: []string{"type", "stringVal", "arrayVal", "objectVal"},
 			},
 		},
 	}
@@ -1120,7 +1136,7 @@ func schema_pkg_apis_pipeline_v1beta1_ParamSpec(ref common.ReferenceCallback) co
 					},
 					"type": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Type is the user-specified type of the parameter. The possible types are currently \"string\" and \"array\", and \"string\" is the default.",
+							Description: "Type is the user-specified type of the parameter. The possible types are currently \"string\", \"array\" and \"object\", and \"string\" is the default.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -1130,6 +1146,21 @@ func schema_pkg_apis_pipeline_v1beta1_ParamSpec(ref common.ReferenceCallback) co
 							Description: "Description is a user-facing description of the parameter that may be used to populate a UI.",
 							Type:        []string{"string"},
 							Format:      "",
+						},
+					},
+					"properties": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Properties is the JSON Schema properties to support key-value pairs parameter.",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1.PropertySpec"),
+									},
+								},
+							},
 						},
 					},
 					"default": {
@@ -1143,7 +1174,7 @@ func schema_pkg_apis_pipeline_v1beta1_ParamSpec(ref common.ReferenceCallback) co
 			},
 		},
 		Dependencies: []string{
-			"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1.ArrayOrString"},
+			"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1.ArrayOrString", "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1.PropertySpec"},
 	}
 }
 
@@ -2894,6 +2925,25 @@ func schema_pkg_apis_pipeline_v1beta1_PipelineWorkspaceDeclaration(ref common.Re
 	}
 }
 
+func schema_pkg_apis_pipeline_v1beta1_PropertySpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "PropertySpec defines the struct for object keys",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"type": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
 func schema_pkg_apis_pipeline_v1beta1_ResolverParam(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -3467,7 +3517,7 @@ func schema_pkg_apis_pipeline_v1beta1_Step(ref common.ReferenceCallback) common.
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "List of ports to expose from the container. Exposing a port here gives the system additional information about the network connections a container uses, but is primarily informational. Not specifying a port here DOES NOT prevent that port from being exposed. Any port which is listening on the default \"0.0.0.0\" address inside a container will be accessible from the network. Cannot be updated.",
+							Description: "Deprecated. This field will be removed in a future release. List of ports to expose from the container. Exposing a port here gives the system additional information about the network connections a container uses, but is primarily informational. Not specifying a port here DOES NOT prevent that port from being exposed. Any port which is listening on the default \"0.0.0.0\" address inside a container will be accessible from the network. Cannot be updated.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -3570,38 +3620,38 @@ func schema_pkg_apis_pipeline_v1beta1_Step(ref common.ReferenceCallback) common.
 					},
 					"livenessProbe": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Periodic probe of container liveness. Container will be restarted if the probe fails. Cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes",
+							Description: "Deprecated. This field will be removed in a future release. Periodic probe of container liveness. Container will be restarted if the probe fails. Cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes",
 							Ref:         ref("k8s.io/api/core/v1.Probe"),
 						},
 					},
 					"readinessProbe": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Periodic probe of container service readiness. Container will be removed from service endpoints if the probe fails. Cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes",
+							Description: "Deprecated. This field will be removed in a future release. Periodic probe of container service readiness. Container will be removed from service endpoints if the probe fails. Cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes",
 							Ref:         ref("k8s.io/api/core/v1.Probe"),
 						},
 					},
 					"startupProbe": {
 						SchemaProps: spec.SchemaProps{
-							Description: "StartupProbe indicates that the Pod has successfully initialized. If specified, no other probes are executed until this completes successfully. If this probe fails, the Pod will be restarted, just as if the livenessProbe failed. This can be used to provide different probe parameters at the beginning of a Pod's lifecycle, when it might take a long time to load data or warm a cache, than during steady-state operation. This cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes",
+							Description: "Deprecated. This field will be removed in a future release. StartupProbe indicates that the Pod has successfully initialized. If specified, no other probes are executed until this completes successfully. If this probe fails, the Pod will be restarted, just as if the livenessProbe failed. This can be used to provide different probe parameters at the beginning of a Pod's lifecycle, when it might take a long time to load data or warm a cache, than during steady-state operation. This cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes",
 							Ref:         ref("k8s.io/api/core/v1.Probe"),
 						},
 					},
 					"lifecycle": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Actions that the management system should take in response to container lifecycle events. Cannot be updated.",
+							Description: "Deprecated. This field will be removed in a future release. Actions that the management system should take in response to container lifecycle events. Cannot be updated.",
 							Ref:         ref("k8s.io/api/core/v1.Lifecycle"),
 						},
 					},
 					"terminationMessagePath": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Optional: Path at which the file to which the container's termination message will be written is mounted into the container's filesystem. Message written is intended to be brief final status, such as an assertion failure message. Will be truncated by the node if greater than 4096 bytes. The total message length across all containers will be limited to 12kb. Defaults to /dev/termination-log. Cannot be updated.",
+							Description: "Deprecated. This field will be removed in a future release. Optional: Path at which the file to which the container's termination message will be written is mounted into the container's filesystem. Message written is intended to be brief final status, such as an assertion failure message. Will be truncated by the node if greater than 4096 bytes. The total message length across all containers will be limited to 12kb. Defaults to /dev/termination-log. Cannot be updated.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"terminationMessagePolicy": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Indicate how the termination message should be populated. File will use the contents of terminationMessagePath to populate the container status message on both success and failure. FallbackToLogsOnError will use the last chunk of container log output if the termination message file is empty and the container exited with an error. The log output is limited to 2048 bytes or 80 lines, whichever is smaller. Defaults to File. Cannot be updated.",
+							Description: "Deprecated. This field will be removed in a future release. Indicate how the termination message should be populated. File will use the contents of terminationMessagePath to populate the container status message on both success and failure. FallbackToLogsOnError will use the last chunk of container log output if the termination message file is empty and the container exited with an error. The log output is limited to 2048 bytes or 80 lines, whichever is smaller. Defaults to File. Cannot be updated.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -3621,21 +3671,21 @@ func schema_pkg_apis_pipeline_v1beta1_Step(ref common.ReferenceCallback) common.
 					},
 					"stdin": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Whether this container should allocate a buffer for stdin in the container runtime. If this is not set, reads from stdin in the container will always result in EOF. Default is false.",
+							Description: "Deprecated. This field will be removed in a future release. Whether this container should allocate a buffer for stdin in the container runtime. If this is not set, reads from stdin in the container will always result in EOF. Default is false.",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
 					},
 					"stdinOnce": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Whether the container runtime should close the stdin channel after it has been opened by a single attach. When stdin is true the stdin stream will remain open across multiple attach sessions. If stdinOnce is set to true, stdin is opened on container start, is empty until the first client attaches to stdin, and then remains open and accepts data until the client disconnects, at which time stdin is closed and remains closed until the container is restarted. If this flag is false, a container processes that reads from stdin will never receive an EOF. Default is false",
+							Description: "Deprecated. This field will be removed in a future release. Whether the container runtime should close the stdin channel after it has been opened by a single attach. When stdin is true the stdin stream will remain open across multiple attach sessions. If stdinOnce is set to true, stdin is opened on container start, is empty until the first client attaches to stdin, and then remains open and accepts data until the client disconnects, at which time stdin is closed and remains closed until the container is restarted. If this flag is false, a container processes that reads from stdin will never receive an EOF. Default is false",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
 					},
 					"tty": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Whether this container should allocate a TTY for itself, also requires 'stdin' to be true. Default is false.",
+							Description: "Deprecated. This field will be removed in a future release. Whether this container should allocate a TTY for itself, also requires 'stdin' to be true. Default is false.",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
@@ -3748,7 +3798,7 @@ func schema_pkg_apis_pipeline_v1beta1_StepTemplate(ref common.ReferenceCallback)
 				Properties: map[string]spec.Schema{
 					"name": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Name of the container specified as a DNS_LABEL. Each container in a pod must have a unique name (DNS_LABEL). Cannot be updated.",
+							Description: "Deprecated. This field will be removed in a future release. Name of the container specified as a DNS_LABEL. Each container in a pod must have a unique name (DNS_LABEL). Cannot be updated.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -3821,7 +3871,7 @@ func schema_pkg_apis_pipeline_v1beta1_StepTemplate(ref common.ReferenceCallback)
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "List of ports to expose from the container. Exposing a port here gives the system additional information about the network connections a container uses, but is primarily informational. Not specifying a port here DOES NOT prevent that port from being exposed. Any port which is listening on the default \"0.0.0.0\" address inside a container will be accessible from the network. Cannot be updated.",
+							Description: "Deprecated. This field will be removed in a future release. List of ports to expose from the container. Exposing a port here gives the system additional information about the network connections a container uses, but is primarily informational. Not specifying a port here DOES NOT prevent that port from being exposed. Any port which is listening on the default \"0.0.0.0\" address inside a container will be accessible from the network. Cannot be updated.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -3924,38 +3974,38 @@ func schema_pkg_apis_pipeline_v1beta1_StepTemplate(ref common.ReferenceCallback)
 					},
 					"livenessProbe": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Periodic probe of container liveness. Container will be restarted if the probe fails. Cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes",
+							Description: "Deprecated. This field will be removed in a future release. Periodic probe of container liveness. Container will be restarted if the probe fails. Cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes",
 							Ref:         ref("k8s.io/api/core/v1.Probe"),
 						},
 					},
 					"readinessProbe": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Periodic probe of container service readiness. Container will be removed from service endpoints if the probe fails. Cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes",
+							Description: "Deprecated. This field will be removed in a future release. Periodic probe of container service readiness. Container will be removed from service endpoints if the probe fails. Cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes",
 							Ref:         ref("k8s.io/api/core/v1.Probe"),
 						},
 					},
 					"startupProbe": {
 						SchemaProps: spec.SchemaProps{
-							Description: "StartupProbe indicates that the Pod has successfully initialized. If specified, no other probes are executed until this completes successfully. If this probe fails, the Pod will be restarted, just as if the livenessProbe failed. This can be used to provide different probe parameters at the beginning of a Pod's lifecycle, when it might take a long time to load data or warm a cache, than during steady-state operation. This cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes",
+							Description: "Deprecated. This field will be removed in a future release. StartupProbe indicates that the Pod has successfully initialized. If specified, no other probes are executed until this completes successfully. If this probe fails, the Pod will be restarted, just as if the livenessProbe failed. This can be used to provide different probe parameters at the beginning of a Pod's lifecycle, when it might take a long time to load data or warm a cache, than during steady-state operation. This cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes",
 							Ref:         ref("k8s.io/api/core/v1.Probe"),
 						},
 					},
 					"lifecycle": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Actions that the management system should take in response to container lifecycle events. Cannot be updated.",
+							Description: "Deprecated. This field will be removed in a future release. Actions that the management system should take in response to container lifecycle events. Cannot be updated.",
 							Ref:         ref("k8s.io/api/core/v1.Lifecycle"),
 						},
 					},
 					"terminationMessagePath": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Optional: Path at which the file to which the container's termination message will be written is mounted into the container's filesystem. Message written is intended to be brief final status, such as an assertion failure message. Will be truncated by the node if greater than 4096 bytes. The total message length across all containers will be limited to 12kb. Defaults to /dev/termination-log. Cannot be updated.",
+							Description: "Deprecated. This field will be removed in a future release. Optional: Path at which the file to which the container's termination message will be written is mounted into the container's filesystem. Message written is intended to be brief final status, such as an assertion failure message. Will be truncated by the node if greater than 4096 bytes. The total message length across all containers will be limited to 12kb. Defaults to /dev/termination-log. Cannot be updated.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"terminationMessagePolicy": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Indicate how the termination message should be populated. File will use the contents of terminationMessagePath to populate the container status message on both success and failure. FallbackToLogsOnError will use the last chunk of container log output if the termination message file is empty and the container exited with an error. The log output is limited to 2048 bytes or 80 lines, whichever is smaller. Defaults to File. Cannot be updated.",
+							Description: "Deprecated. This field will be removed in a future release. Indicate how the termination message should be populated. File will use the contents of terminationMessagePath to populate the container status message on both success and failure. FallbackToLogsOnError will use the last chunk of container log output if the termination message file is empty and the container exited with an error. The log output is limited to 2048 bytes or 80 lines, whichever is smaller. Defaults to File. Cannot be updated.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -3975,21 +4025,21 @@ func schema_pkg_apis_pipeline_v1beta1_StepTemplate(ref common.ReferenceCallback)
 					},
 					"stdin": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Whether this container should allocate a buffer for stdin in the container runtime. If this is not set, reads from stdin in the container will always result in EOF. Default is false.",
+							Description: "Deprecated. This field will be removed in a future release. Whether this container should allocate a buffer for stdin in the container runtime. If this is not set, reads from stdin in the container will always result in EOF. Default is false.",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
 					},
 					"stdinOnce": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Whether the container runtime should close the stdin channel after it has been opened by a single attach. When stdin is true the stdin stream will remain open across multiple attach sessions. If stdinOnce is set to true, stdin is opened on container start, is empty until the first client attaches to stdin, and then remains open and accepts data until the client disconnects, at which time stdin is closed and remains closed until the container is restarted. If this flag is false, a container processes that reads from stdin will never receive an EOF. Default is false",
+							Description: "Deprecated. This field will be removed in a future release. Whether the container runtime should close the stdin channel after it has been opened by a single attach. When stdin is true the stdin stream will remain open across multiple attach sessions. If stdinOnce is set to true, stdin is opened on container start, is empty until the first client attaches to stdin, and then remains open and accepts data until the client disconnects, at which time stdin is closed and remains closed until the container is restarted. If this flag is false, a container processes that reads from stdin will never receive an EOF. Default is false",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
 					},
 					"tty": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Whether this container should allocate a TTY for itself, also requires 'stdin' to be true. Default is false.",
+							Description: "Deprecated. This field will be removed in a future release. Whether this container should allocate a TTY for itself, also requires 'stdin' to be true. Default is false.",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
@@ -4620,15 +4670,16 @@ func schema_pkg_apis_pipeline_v1beta1_TaskRunResult(ref common.ReferenceCallback
 					"value": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Value the given value of the result",
-							Default:     "",
-							Type:        []string{"string"},
-							Format:      "",
+							Default:     map[string]interface{}{},
+							Ref:         ref("github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1.ArrayOrString"),
 						},
 					},
 				},
 				Required: []string{"name", "value"},
 			},
 		},
+		Dependencies: []string{
+			"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1.ArrayOrString"},
 	}
 }
 

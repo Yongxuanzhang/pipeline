@@ -38,13 +38,16 @@ type ParamSpec struct {
 	// Name declares the name by which a parameter is referenced.
 	Name string `json:"name"`
 	// Type is the user-specified type of the parameter. The possible types
-	// are currently "string" and "array", and "string" is the default.
+	// are currently "string", "array" and "object", and "string" is the default.
 	// +optional
 	Type ParamType `json:"type,omitempty"`
 	// Description is a user-facing description of the parameter that may be
 	// used to populate a UI.
 	// +optional
 	Description string `json:"description,omitempty"`
+	// Properties is the JSON Schema properties to support key-value pairs parameter.
+	// +optional
+	Properties map[string]PropertySpec `json:"properties,omitempty"`
 	// Default is the value a parameter takes if no input value is supplied. If
 	// default is set, a Task may be executed without a supplied value for the
 	// parameter.
@@ -52,25 +55,47 @@ type ParamSpec struct {
 	Default *ArrayOrString `json:"default,omitempty"`
 }
 
+// PropertySpec defines the struct for object keys
+type PropertySpec struct {
+	Type ParamType `json:"type,omitempty"`
+}
+
 // SetDefaults set the default type
 func (pp *ParamSpec) SetDefaults(ctx context.Context) {
-	if pp != nil && pp.Type == "" {
-		if pp.Default != nil {
-			// propagate the parsed ArrayOrString's type to the parent ParamSpec's type
-			if pp.Default.Type != "" {
-				// propagate the default type if specified
-				pp.Type = pp.Default.Type
-			} else {
-				// determine the type based on the array or string values when default value is specified but not the type
-				if pp.Default.ArrayVal != nil {
-					pp.Type = ParamTypeArray
-				} else {
-					pp.Type = ParamTypeString
-				}
-			}
-		} else {
-			// ParamTypeString is the default value (when no type can be inferred from the default value)
-			pp.Type = ParamTypeString
+	if pp == nil {
+		return
+	}
+
+	// Propagate inferred type to the parent ParamSpec's type, and default type to the PropertySpec's type
+	// The sequence to look at is type in ParamSpec -> properties -> type in default -> array/string/object value in default
+	// If neither `properties` or `default` section is provided, ParamTypeString will be the default type.
+	switch {
+	case pp.Type != "":
+		// If param type is provided by the author, do nothing but just set default type for PropertySpec in case `properties` section is provided.
+		pp.setDefaultsForProperties(ctx)
+	case pp.Properties != nil:
+		pp.Type = ParamTypeObject
+		// Also set default type for PropertySpec
+		pp.setDefaultsForProperties(ctx)
+	case pp.Default == nil:
+		// ParamTypeString is the default value (when no type can be inferred from the default value)
+		pp.Type = ParamTypeString
+	case pp.Default.Type != "":
+		pp.Type = pp.Default.Type
+	case pp.Default.ArrayVal != nil:
+		pp.Type = ParamTypeArray
+	case pp.Default.ObjectVal != nil:
+		pp.Type = ParamTypeObject
+	default:
+		pp.Type = ParamTypeString
+	}
+}
+
+// setDefaultsForProperties sets default type for PropertySpec (string) if it's not specified
+func (pp *ParamSpec) setDefaultsForProperties(ctx context.Context) {
+	for key, propertySpec := range pp.Properties {
+		if propertySpec.Type == "" {
+			pp.Properties[key] = PropertySpec{Type: ParamTypeString}
 		}
 	}
 }
@@ -93,31 +118,63 @@ type ParamType string
 const (
 	ParamTypeString ParamType = "string"
 	ParamTypeArray  ParamType = "array"
+	ParamTypeObject ParamType = "object"
 )
 
 // AllParamTypes can be used for ParamType validation.
-var AllParamTypes = []ParamType{ParamTypeString, ParamTypeArray}
+var AllParamTypes = []ParamType{ParamTypeString, ParamTypeArray, ParamTypeObject}
 
 // ArrayOrString is modeled after IntOrString in kubernetes/apimachinery:
 
 // ArrayOrString is a type that can hold a single string or string array.
 // Used in JSON unmarshalling so that a single JSON field can accept
 // either an individual string or an array of strings.
+// TODO (@chuangw6): This struct will be renamed or be embedded in a new struct to take into
+// consideration the object case after the community reaches an agreement on it.
 type ArrayOrString struct {
 	Type      ParamType `json:"type"` // Represents the stored type of ArrayOrString.
 	StringVal string    `json:"stringVal"`
 	// +listType=atomic
-	ArrayVal []string `json:"arrayVal"`
+	ArrayVal  []string          `json:"arrayVal"`
+	ObjectVal map[string]string `json:"objectVal"`
 }
 
 // UnmarshalJSON implements the json.Unmarshaller interface.
 func (arrayOrString *ArrayOrString) UnmarshalJSON(value []byte) error {
-	if value[0] == '"' {
+	// ArrayOrString is used for Resutls Value as well, the results can be any kind of
+	// data so we need to check if it is empty.
+	if len(value) == 0 {
 		arrayOrString.Type = ParamTypeString
-		return json.Unmarshal(value, &arrayOrString.StringVal)
+		return nil
 	}
-	arrayOrString.Type = ParamTypeArray
-	return json.Unmarshal(value, &arrayOrString.ArrayVal)
+	switch value[0] {
+	case '[':
+		// We're tring to Unmarshal to []string, but for cases like []int or other types
+		// of nested array which we don't support yet, we should continue and Unmarshal
+		// it to String. If the Type being set doesn't match what it actually should be,
+		// it will be captured somewhere else.
+		arrayOrString.Type = ParamTypeArray
+		if err := json.Unmarshal(value, &arrayOrString.ArrayVal); err == nil {
+			return nil
+		}
+	case '{':
+		arrayOrString.Type = ParamTypeObject
+		if err := json.Unmarshal(value, &arrayOrString.ObjectVal); err == nil {
+			return nil
+		}
+	default:
+		arrayOrString.Type = ParamTypeString
+		if err := json.Unmarshal(value, &arrayOrString.StringVal); err == nil {
+			return nil
+		}
+	}
+	// if failed to unmarshal to above types we will convert the value to string and
+	// marshal it to string
+	arrayOrString.Type = ParamTypeString
+	arrayOrString.StringVal = string(value)
+	arrayOrString.ArrayVal = nil
+	arrayOrString.ObjectVal = nil
+	return nil
 }
 
 // MarshalJSON implements the json.Marshaller interface.
@@ -127,6 +184,8 @@ func (arrayOrString ArrayOrString) MarshalJSON() ([]byte, error) {
 		return json.Marshal(arrayOrString.StringVal)
 	case ParamTypeArray:
 		return json.Marshal(arrayOrString.ArrayVal)
+	case ParamTypeObject:
+		return json.Marshal(arrayOrString.ObjectVal)
 	default:
 		return []byte{}, fmt.Errorf("impossible ArrayOrString.Type: %q", arrayOrString.Type)
 	}
@@ -157,6 +216,14 @@ func NewArrayOrString(value string, values ...string) *ArrayOrString {
 	return &ArrayOrString{
 		Type:      ParamTypeString,
 		StringVal: value,
+	}
+}
+
+// NewObject creates an ArrayOrString of type ParamTypeObject using the provided key-value pairs
+func NewObject(pairs map[string]string) *ArrayOrString {
+	return &ArrayOrString{
+		Type:      ParamTypeObject,
+		ObjectVal: pairs,
 	}
 }
 

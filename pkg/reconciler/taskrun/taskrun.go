@@ -332,7 +332,7 @@ func (c *Reconciler) prepare(ctx context.Context, tr *v1beta1.TaskRun) (*v1beta1
 		return nil, nil, controller.NewPermanentError(err)
 	}
 
-	if err := ValidateResolvedTaskResources(ctx, tr.Spec.Params, rtr); err != nil {
+	if err := ValidateResolvedTaskResources(ctx, tr.Spec.Params, []v1beta1.Param{}, rtr); err != nil {
 		logger.Errorf("TaskRun %q resources are invalid: %v", tr.Name, err)
 		tr.Status.MarkResourceFailed(podconvert.ReasonFailedValidation, err)
 		return nil, nil, controller.NewPermanentError(err)
@@ -455,10 +455,11 @@ func (c *Reconciler) reconcile(ctx context.Context, tr *v1beta1.TaskRun, rtr *re
 	}
 
 	// Convert the Pod's status to the equivalent TaskRun Status.
-	tr.Status, err = podconvert.MakeTaskRunStatus(logger, *tr, pod)
+	tr.Status, err = podconvert.MakeTaskRunStatus(ctx, logger, *tr, pod)
 	if err != nil {
 		return err
 	}
+	// TODO(#4723): Validate the taskrun results against taskresults for object val
 
 	logger.Infof("Successfully reconciled taskrun %s/%s with status: %#v", tr.Name, tr.Namespace, tr.Status.GetCondition(apis.ConditionSucceeded))
 	return nil

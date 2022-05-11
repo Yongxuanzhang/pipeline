@@ -73,7 +73,44 @@ func TestParamSpec_SetDefaults(t *testing.T) {
 			},
 		},
 	}, {
-		name: "fully defined ParamSpec",
+		name: "inferred type from default value - object",
+		before: &v1beta1.ParamSpec{
+			Name: "parametername",
+			Default: &v1beta1.ArrayOrString{
+				ObjectVal: map[string]string{"url": "test", "path": "test"},
+			},
+		},
+		defaultsApplied: &v1beta1.ParamSpec{
+			Name: "parametername",
+			Type: v1beta1.ParamTypeObject,
+			Default: &v1beta1.ArrayOrString{
+				ObjectVal: map[string]string{"url": "test", "path": "test"},
+			},
+		},
+	}, {
+		name: "inferred type from properties - PropertySpec type is not provided",
+		before: &v1beta1.ParamSpec{
+			Name:       "parametername",
+			Properties: map[string]v1beta1.PropertySpec{"key1": {}},
+		},
+		defaultsApplied: &v1beta1.ParamSpec{
+			Name:       "parametername",
+			Type:       v1beta1.ParamTypeObject,
+			Properties: map[string]v1beta1.PropertySpec{"key1": {Type: "string"}},
+		},
+	}, {
+		name: "inferred type from properties - PropertySpec type is provided",
+		before: &v1beta1.ParamSpec{
+			Name:       "parametername",
+			Properties: map[string]v1beta1.PropertySpec{"key2": {Type: "string"}},
+		},
+		defaultsApplied: &v1beta1.ParamSpec{
+			Name:       "parametername",
+			Type:       v1beta1.ParamTypeObject,
+			Properties: map[string]v1beta1.PropertySpec{"key2": {Type: "string"}},
+		},
+	}, {
+		name: "fully defined ParamSpec - array",
 		before: &v1beta1.ParamSpec{
 			Name:        "parametername",
 			Type:        v1beta1.ParamTypeArray,
@@ -88,6 +125,24 @@ func TestParamSpec_SetDefaults(t *testing.T) {
 			Description: "a description",
 			Default: &v1beta1.ArrayOrString{
 				ArrayVal: []string{"array"},
+			},
+		},
+	}, {
+		name: "fully defined ParamSpec - object",
+		before: &v1beta1.ParamSpec{
+			Name:        "parametername",
+			Type:        v1beta1.ParamTypeObject,
+			Description: "a description",
+			Default: &v1beta1.ArrayOrString{
+				ObjectVal: map[string]string{"url": "test", "path": "test"},
+			},
+		},
+		defaultsApplied: &v1beta1.ParamSpec{
+			Name:        "parametername",
+			Type:        v1beta1.ParamTypeObject,
+			Description: "a description",
+			Default: &v1beta1.ArrayOrString{
+				ObjectVal: map[string]string{"url": "test", "path": "test"},
 			},
 		},
 	}}
@@ -173,6 +228,10 @@ func TestArrayOrString_UnmarshalJSON(t *testing.T) {
 		result v1beta1.ArrayOrString
 	}{
 		{
+			input:  map[string]interface{}{"val": 123},
+			result: *v1beta1.NewArrayOrString("123"),
+		},
+		{
 			input:  map[string]interface{}{"val": "123"},
 			result: *v1beta1.NewArrayOrString("123"),
 		},
@@ -182,7 +241,7 @@ func TestArrayOrString_UnmarshalJSON(t *testing.T) {
 		},
 		{
 			input:  map[string]interface{}{"val": nil},
-			result: v1beta1.ArrayOrString{Type: v1beta1.ParamTypeArray, ArrayVal: nil},
+			result: v1beta1.ArrayOrString{Type: v1beta1.ParamTypeString, ArrayVal: nil},
 		},
 		{
 			input:  map[string]interface{}{"val": []string{}},
@@ -195,6 +254,10 @@ func TestArrayOrString_UnmarshalJSON(t *testing.T) {
 		{
 			input:  map[string]interface{}{"val": []string{"multiple", "elements"}},
 			result: v1beta1.ArrayOrString{Type: v1beta1.ParamTypeArray, ArrayVal: []string{"multiple", "elements"}},
+		},
+		{
+			input:  map[string]interface{}{"val": map[string]string{"key1": "val1", "key2": "val2"}},
+			result: v1beta1.ArrayOrString{Type: v1beta1.ParamTypeObject, ObjectVal: map[string]string{"key1": "val1", "key2": "val2"}},
 		},
 	}
 
@@ -223,6 +286,48 @@ func TestArrayOrString_UnmarshalJSON(t *testing.T) {
 	}
 }
 
+func TestArrayOrString_UnmarshalJSON_Directly(t *testing.T) {
+	cases := []struct {
+		desc     string
+		input    string
+		expected v1beta1.ArrayOrString
+	}{
+		{desc: "empty value", input: ``, expected: *v1beta1.NewArrayOrString("")},
+		{desc: "int value", input: `1`, expected: *v1beta1.NewArrayOrString("1")},
+		{desc: "int array", input: `[1,2,3]`, expected: *v1beta1.NewArrayOrString("[1,2,3]")},
+		{desc: "nested array", input: `[1,\"2\",3]`, expected: *v1beta1.NewArrayOrString(`[1,\"2\",3]`)},
+		{desc: "string value", input: `hello`, expected: *v1beta1.NewArrayOrString("hello")},
+		{desc: "array value", input: `["hello","world"]`, expected: *v1beta1.NewArrayOrString("hello", "world")},
+	}
+
+	for _, c := range cases {
+		aos := v1beta1.ArrayOrString{}
+		if err := aos.UnmarshalJSON([]byte(c.input)); err != nil {
+			t.Errorf("Failed to unmarshal input '%v': %v", c.input, err)
+		}
+		if !reflect.DeepEqual(aos, c.expected) {
+			t.Errorf("Failed to unmarshal input '%v': expected %+v, got %+v", c.input, c.expected, aos)
+		}
+	}
+}
+
+func TestArrayOrString_UnmarshalJSON_Error(t *testing.T) {
+	cases := []struct {
+		desc  string
+		input string
+	}{
+		{desc: "empty value", input: "{\"val\": }"},
+		{desc: "wrong beginning value", input: "{\"val\": @}"},
+	}
+
+	for _, c := range cases {
+		var result ArrayOrStringHolder
+		if err := json.Unmarshal([]byte(c.input), &result); err == nil {
+			t.Errorf("Should return err but got nil '%v'", c.input)
+		}
+	}
+}
+
 func TestArrayOrString_MarshalJSON(t *testing.T) {
 	cases := []struct {
 		input  v1beta1.ArrayOrString
@@ -231,6 +336,7 @@ func TestArrayOrString_MarshalJSON(t *testing.T) {
 		{*v1beta1.NewArrayOrString("123"), "{\"val\":\"123\"}"},
 		{*v1beta1.NewArrayOrString("123", "1234"), "{\"val\":[\"123\",\"1234\"]}"},
 		{*v1beta1.NewArrayOrString("a", "a", "a"), "{\"val\":[\"a\",\"a\",\"a\"]}"},
+		{*v1beta1.NewObject(map[string]string{"key1": "var1", "key2": "var2"}), "{\"val\":{\"key1\":\"var1\",\"key2\":\"var2\"}}"},
 	}
 
 	for _, c := range cases {

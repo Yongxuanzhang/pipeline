@@ -299,12 +299,13 @@
       }
     },
     "v1beta1.ArrayOrString": {
-      "description": "ArrayOrString is a type that can hold a single string or string array. Used in JSON unmarshalling so that a single JSON field can accept either an individual string or an array of strings.",
+      "description": "ArrayOrString is a type that can hold a single string or string array. Used in JSON unmarshalling so that a single JSON field can accept either an individual string or an array of strings. consideration the object case after the community reaches an agreement on it.",
       "type": "object",
       "required": [
         "type",
         "stringVal",
-        "arrayVal"
+        "arrayVal",
+        "objectVal"
       ],
       "properties": {
         "arrayVal": {
@@ -314,6 +315,13 @@
             "default": ""
           },
           "x-kubernetes-list-type": "atomic"
+        },
+        "objectVal": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string",
+            "default": ""
+          }
         },
         "stringVal": {
           "description": "Represents the stored type of ArrayOrString.",
@@ -720,8 +728,16 @@
           "type": "string",
           "default": ""
         },
+        "properties": {
+          "description": "Properties is the JSON Schema properties to support key-value pairs parameter.",
+          "type": "object",
+          "additionalProperties": {
+            "default": {},
+            "$ref": "#/definitions/v1beta1.PropertySpec"
+          }
+        },
         "type": {
-          "description": "Type is the user-specified type of the parameter. The possible types are currently \"string\" and \"array\", and \"string\" is the default.",
+          "description": "Type is the user-specified type of the parameter. The possible types are currently \"string\", \"array\" and \"object\", and \"string\" is the default.",
           "type": "string"
         }
       }
@@ -1642,6 +1658,15 @@
         }
       }
     },
+    "v1beta1.PropertySpec": {
+      "description": "PropertySpec defines the struct for object keys",
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string"
+        }
+      }
+    },
     "v1beta1.ResolverParam": {
       "description": "ResolverParam is a single parameter passed to a resolver.",
       "type": "object",
@@ -1968,11 +1993,11 @@
           "type": "string"
         },
         "lifecycle": {
-          "description": "Actions that the management system should take in response to container lifecycle events. Cannot be updated.",
+          "description": "Deprecated. This field will be removed in a future release. Actions that the management system should take in response to container lifecycle events. Cannot be updated.",
           "$ref": "#/definitions/v1.Lifecycle"
         },
         "livenessProbe": {
-          "description": "Periodic probe of container liveness. Container will be restarted if the probe fails. Cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes",
+          "description": "Deprecated. This field will be removed in a future release. Periodic probe of container liveness. Container will be restarted if the probe fails. Cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes",
           "$ref": "#/definitions/v1.Probe"
         },
         "name": {
@@ -1985,7 +2010,7 @@
           "type": "string"
         },
         "ports": {
-          "description": "List of ports to expose from the container. Exposing a port here gives the system additional information about the network connections a container uses, but is primarily informational. Not specifying a port here DOES NOT prevent that port from being exposed. Any port which is listening on the default \"0.0.0.0\" address inside a container will be accessible from the network. Cannot be updated.",
+          "description": "Deprecated. This field will be removed in a future release. List of ports to expose from the container. Exposing a port here gives the system additional information about the network connections a container uses, but is primarily informational. Not specifying a port here DOES NOT prevent that port from being exposed. Any port which is listening on the default \"0.0.0.0\" address inside a container will be accessible from the network. Cannot be updated.",
           "type": "array",
           "items": {
             "default": {},
@@ -2000,7 +2025,7 @@
           "x-kubernetes-patch-strategy": "merge"
         },
         "readinessProbe": {
-          "description": "Periodic probe of container service readiness. Container will be removed from service endpoints if the probe fails. Cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes",
+          "description": "Deprecated. This field will be removed in a future release. Periodic probe of container service readiness. Container will be removed from service endpoints if the probe fails. Cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes",
           "$ref": "#/definitions/v1.Probe"
         },
         "resources": {
@@ -2017,23 +2042,23 @@
           "$ref": "#/definitions/v1.SecurityContext"
         },
         "startupProbe": {
-          "description": "StartupProbe indicates that the Pod has successfully initialized. If specified, no other probes are executed until this completes successfully. If this probe fails, the Pod will be restarted, just as if the livenessProbe failed. This can be used to provide different probe parameters at the beginning of a Pod's lifecycle, when it might take a long time to load data or warm a cache, than during steady-state operation. This cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes",
+          "description": "Deprecated. This field will be removed in a future release. StartupProbe indicates that the Pod has successfully initialized. If specified, no other probes are executed until this completes successfully. If this probe fails, the Pod will be restarted, just as if the livenessProbe failed. This can be used to provide different probe parameters at the beginning of a Pod's lifecycle, when it might take a long time to load data or warm a cache, than during steady-state operation. This cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes",
           "$ref": "#/definitions/v1.Probe"
         },
         "stdin": {
-          "description": "Whether this container should allocate a buffer for stdin in the container runtime. If this is not set, reads from stdin in the container will always result in EOF. Default is false.",
+          "description": "Deprecated. This field will be removed in a future release. Whether this container should allocate a buffer for stdin in the container runtime. If this is not set, reads from stdin in the container will always result in EOF. Default is false.",
           "type": "boolean"
         },
         "stdinOnce": {
-          "description": "Whether the container runtime should close the stdin channel after it has been opened by a single attach. When stdin is true the stdin stream will remain open across multiple attach sessions. If stdinOnce is set to true, stdin is opened on container start, is empty until the first client attaches to stdin, and then remains open and accepts data until the client disconnects, at which time stdin is closed and remains closed until the container is restarted. If this flag is false, a container processes that reads from stdin will never receive an EOF. Default is false",
+          "description": "Deprecated. This field will be removed in a future release. Whether the container runtime should close the stdin channel after it has been opened by a single attach. When stdin is true the stdin stream will remain open across multiple attach sessions. If stdinOnce is set to true, stdin is opened on container start, is empty until the first client attaches to stdin, and then remains open and accepts data until the client disconnects, at which time stdin is closed and remains closed until the container is restarted. If this flag is false, a container processes that reads from stdin will never receive an EOF. Default is false",
           "type": "boolean"
         },
         "terminationMessagePath": {
-          "description": "Optional: Path at which the file to which the container's termination message will be written is mounted into the container's filesystem. Message written is intended to be brief final status, such as an assertion failure message. Will be truncated by the node if greater than 4096 bytes. The total message length across all containers will be limited to 12kb. Defaults to /dev/termination-log. Cannot be updated.",
+          "description": "Deprecated. This field will be removed in a future release. Optional: Path at which the file to which the container's termination message will be written is mounted into the container's filesystem. Message written is intended to be brief final status, such as an assertion failure message. Will be truncated by the node if greater than 4096 bytes. The total message length across all containers will be limited to 12kb. Defaults to /dev/termination-log. Cannot be updated.",
           "type": "string"
         },
         "terminationMessagePolicy": {
-          "description": "Indicate how the termination message should be populated. File will use the contents of terminationMessagePath to populate the container status message on both success and failure. FallbackToLogsOnError will use the last chunk of container log output if the termination message file is empty and the container exited with an error. The log output is limited to 2048 bytes or 80 lines, whichever is smaller. Defaults to File. Cannot be updated.",
+          "description": "Deprecated. This field will be removed in a future release. Indicate how the termination message should be populated. File will use the contents of terminationMessagePath to populate the container status message on both success and failure. FallbackToLogsOnError will use the last chunk of container log output if the termination message file is empty and the container exited with an error. The log output is limited to 2048 bytes or 80 lines, whichever is smaller. Defaults to File. Cannot be updated.",
           "type": "string"
         },
         "timeout": {
@@ -2041,7 +2066,7 @@
           "$ref": "#/definitions/v1.Duration"
         },
         "tty": {
-          "description": "Whether this container should allocate a TTY for itself, also requires 'stdin' to be true. Default is false.",
+          "description": "Deprecated. This field will be removed in a future release. Whether this container should allocate a TTY for itself, also requires 'stdin' to be true. Default is false.",
           "type": "boolean"
         },
         "volumeDevices": {
@@ -2162,20 +2187,20 @@
           "type": "string"
         },
         "lifecycle": {
-          "description": "Actions that the management system should take in response to container lifecycle events. Cannot be updated.",
+          "description": "Deprecated. This field will be removed in a future release. Actions that the management system should take in response to container lifecycle events. Cannot be updated.",
           "$ref": "#/definitions/v1.Lifecycle"
         },
         "livenessProbe": {
-          "description": "Periodic probe of container liveness. Container will be restarted if the probe fails. Cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes",
+          "description": "Deprecated. This field will be removed in a future release. Periodic probe of container liveness. Container will be restarted if the probe fails. Cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes",
           "$ref": "#/definitions/v1.Probe"
         },
         "name": {
-          "description": "Name of the container specified as a DNS_LABEL. Each container in a pod must have a unique name (DNS_LABEL). Cannot be updated.",
+          "description": "Deprecated. This field will be removed in a future release. Name of the container specified as a DNS_LABEL. Each container in a pod must have a unique name (DNS_LABEL). Cannot be updated.",
           "type": "string",
           "default": ""
         },
         "ports": {
-          "description": "List of ports to expose from the container. Exposing a port here gives the system additional information about the network connections a container uses, but is primarily informational. Not specifying a port here DOES NOT prevent that port from being exposed. Any port which is listening on the default \"0.0.0.0\" address inside a container will be accessible from the network. Cannot be updated.",
+          "description": "Deprecated. This field will be removed in a future release. List of ports to expose from the container. Exposing a port here gives the system additional information about the network connections a container uses, but is primarily informational. Not specifying a port here DOES NOT prevent that port from being exposed. Any port which is listening on the default \"0.0.0.0\" address inside a container will be accessible from the network. Cannot be updated.",
           "type": "array",
           "items": {
             "default": {},
@@ -2190,7 +2215,7 @@
           "x-kubernetes-patch-strategy": "merge"
         },
         "readinessProbe": {
-          "description": "Periodic probe of container service readiness. Container will be removed from service endpoints if the probe fails. Cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes",
+          "description": "Deprecated. This field will be removed in a future release. Periodic probe of container service readiness. Container will be removed from service endpoints if the probe fails. Cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes",
           "$ref": "#/definitions/v1.Probe"
         },
         "resources": {
@@ -2203,27 +2228,27 @@
           "$ref": "#/definitions/v1.SecurityContext"
         },
         "startupProbe": {
-          "description": "StartupProbe indicates that the Pod has successfully initialized. If specified, no other probes are executed until this completes successfully. If this probe fails, the Pod will be restarted, just as if the livenessProbe failed. This can be used to provide different probe parameters at the beginning of a Pod's lifecycle, when it might take a long time to load data or warm a cache, than during steady-state operation. This cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes",
+          "description": "Deprecated. This field will be removed in a future release. StartupProbe indicates that the Pod has successfully initialized. If specified, no other probes are executed until this completes successfully. If this probe fails, the Pod will be restarted, just as if the livenessProbe failed. This can be used to provide different probe parameters at the beginning of a Pod's lifecycle, when it might take a long time to load data or warm a cache, than during steady-state operation. This cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes",
           "$ref": "#/definitions/v1.Probe"
         },
         "stdin": {
-          "description": "Whether this container should allocate a buffer for stdin in the container runtime. If this is not set, reads from stdin in the container will always result in EOF. Default is false.",
+          "description": "Deprecated. This field will be removed in a future release. Whether this container should allocate a buffer for stdin in the container runtime. If this is not set, reads from stdin in the container will always result in EOF. Default is false.",
           "type": "boolean"
         },
         "stdinOnce": {
-          "description": "Whether the container runtime should close the stdin channel after it has been opened by a single attach. When stdin is true the stdin stream will remain open across multiple attach sessions. If stdinOnce is set to true, stdin is opened on container start, is empty until the first client attaches to stdin, and then remains open and accepts data until the client disconnects, at which time stdin is closed and remains closed until the container is restarted. If this flag is false, a container processes that reads from stdin will never receive an EOF. Default is false",
+          "description": "Deprecated. This field will be removed in a future release. Whether the container runtime should close the stdin channel after it has been opened by a single attach. When stdin is true the stdin stream will remain open across multiple attach sessions. If stdinOnce is set to true, stdin is opened on container start, is empty until the first client attaches to stdin, and then remains open and accepts data until the client disconnects, at which time stdin is closed and remains closed until the container is restarted. If this flag is false, a container processes that reads from stdin will never receive an EOF. Default is false",
           "type": "boolean"
         },
         "terminationMessagePath": {
-          "description": "Optional: Path at which the file to which the container's termination message will be written is mounted into the container's filesystem. Message written is intended to be brief final status, such as an assertion failure message. Will be truncated by the node if greater than 4096 bytes. The total message length across all containers will be limited to 12kb. Defaults to /dev/termination-log. Cannot be updated.",
+          "description": "Deprecated. This field will be removed in a future release. Optional: Path at which the file to which the container's termination message will be written is mounted into the container's filesystem. Message written is intended to be brief final status, such as an assertion failure message. Will be truncated by the node if greater than 4096 bytes. The total message length across all containers will be limited to 12kb. Defaults to /dev/termination-log. Cannot be updated.",
           "type": "string"
         },
         "terminationMessagePolicy": {
-          "description": "Indicate how the termination message should be populated. File will use the contents of terminationMessagePath to populate the container status message on both success and failure. FallbackToLogsOnError will use the last chunk of container log output if the termination message file is empty and the container exited with an error. The log output is limited to 2048 bytes or 80 lines, whichever is smaller. Defaults to File. Cannot be updated.",
+          "description": "Deprecated. This field will be removed in a future release. Indicate how the termination message should be populated. File will use the contents of terminationMessagePath to populate the container status message on both success and failure. FallbackToLogsOnError will use the last chunk of container log output if the termination message file is empty and the container exited with an error. The log output is limited to 2048 bytes or 80 lines, whichever is smaller. Defaults to File. Cannot be updated.",
           "type": "string"
         },
         "tty": {
-          "description": "Whether this container should allocate a TTY for itself, also requires 'stdin' to be true. Default is false.",
+          "description": "Deprecated. This field will be removed in a future release. Whether this container should allocate a TTY for itself, also requires 'stdin' to be true. Default is false.",
           "type": "boolean"
         },
         "volumeDevices": {
@@ -2580,8 +2605,8 @@
         },
         "value": {
           "description": "Value the given value of the result",
-          "type": "string",
-          "default": ""
+          "default": {},
+          "$ref": "#/definitions/v1beta1.ArrayOrString"
         }
       }
     },

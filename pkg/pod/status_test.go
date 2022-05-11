@@ -17,12 +17,14 @@ limitations under the License.
 package pod
 
 import (
+	"context"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/tektoncd/pipeline/pkg/apis/config"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	"github.com/tektoncd/pipeline/test/diff"
 	corev1 "k8s.io/api/core/v1"
@@ -78,9 +80,9 @@ func TestSetTaskRunStatusBasedOnStepStatus(t *testing.T) {
 					},
 				},
 			}
-
+			ctx := context.Background()
 			logger, _ := logging.NewLogger("", "status")
-			merr := setTaskRunStatusBasedOnStepStatus(logger, c.ContainerStatuses, &tr)
+			merr := setTaskRunStatusBasedOnStepStatus(ctx, logger, c.ContainerStatuses, &tr)
 			if merr != nil {
 				t.Errorf("setTaskRunStatusBasedOnStepStatus: %s", merr)
 			}
@@ -629,7 +631,7 @@ func TestMakeTaskRunStatus(t *testing.T) {
 				}},
 				TaskRunResults: []v1beta1.TaskRunResult{{
 					Name:  "resultName",
-					Value: "resultValue",
+					Value: *v1beta1.NewArrayOrString("resultValue"),
 				}},
 				// We don't actually care about the time, just that it's not nil
 				CompletionTime: &metav1.Time{Time: time.Now()},
@@ -667,7 +669,7 @@ func TestMakeTaskRunStatus(t *testing.T) {
 				}},
 				TaskRunResults: []v1beta1.TaskRunResult{{
 					Name:  "resultName",
-					Value: "resultValue",
+					Value: *v1beta1.NewArrayOrString("resultValue"),
 				}},
 				// We don't actually care about the time, just that it's not nil
 				CompletionTime: &metav1.Time{Time: time.Now()},
@@ -714,10 +716,10 @@ func TestMakeTaskRunStatus(t *testing.T) {
 				Sidecars: []v1beta1.SidecarState{},
 				TaskRunResults: []v1beta1.TaskRunResult{{
 					Name:  "resultNameOne",
-					Value: "resultValueThree",
+					Value: *v1beta1.NewArrayOrString("resultValueThree"),
 				}, {
 					Name:  "resultNameTwo",
-					Value: "resultValueTwo",
+					Value: *v1beta1.NewArrayOrString("resultValueTwo"),
 				}},
 				// We don't actually care about the time, just that it's not nil
 				CompletionTime: &metav1.Time{Time: time.Now()},
@@ -806,7 +808,7 @@ func TestMakeTaskRunStatus(t *testing.T) {
 				}},
 				TaskRunResults: []v1beta1.TaskRunResult{{
 					Name:  "resultNameThree",
-					Value: "",
+					Value: *v1beta1.NewArrayOrString(""),
 				}},
 				// We don't actually care about the time, just that it's not nil
 				CompletionTime: &metav1.Time{Time: time.Now()},
@@ -844,7 +846,7 @@ func TestMakeTaskRunStatus(t *testing.T) {
 				}},
 				TaskRunResults: []v1beta1.TaskRunResult{{
 					Name:  "resultNameThree",
-					Value: "",
+					Value: *v1beta1.NewArrayOrString(""),
 				}},
 				// We don't actually care about the time, just that it's not nil
 				CompletionTime: &metav1.Time{Time: time.Now()},
@@ -1014,9 +1016,9 @@ func TestMakeTaskRunStatus(t *testing.T) {
 					},
 				},
 			}
-
+			ctx := context.Background()
 			logger, _ := logging.NewLogger("", "status")
-			got, err := MakeTaskRunStatus(logger, tr, &c.pod)
+			got, err := MakeTaskRunStatus(ctx, logger, tr, &c.pod)
 			if err != nil {
 				t.Errorf("MakeTaskRunResult: %s", err)
 			}
@@ -1039,6 +1041,184 @@ func TestMakeTaskRunStatus(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestMakeTaskRunStatusAlpha(t *testing.T) {
+	ctx := context.Background()
+	cfg := config.FromContextOrDefaults(ctx)
+	cfg.FeatureFlags.EnableAPIFields = config.AlphaAPIFields
+	ctx = config.ToContext(ctx, cfg)
+
+	for _, c := range []struct {
+		desc      string
+		podStatus corev1.PodStatus
+		pod       corev1.Pod
+		want      v1beta1.TaskRunStatus
+	}{{
+		desc: "test empty result",
+		podStatus: corev1.PodStatus{
+			Phase: corev1.PodSucceeded,
+			ContainerStatuses: []corev1.ContainerStatus{{
+				Name: "step-bar",
+				State: corev1.ContainerState{
+					Terminated: &corev1.ContainerStateTerminated{
+						Message: `[{"key":"resultName","value":"", "type":1}, {"key":"digest","value":"sha256:1234","resourceRef":{"name":"source-image"}}]`,
+					},
+				},
+			}},
+		},
+		want: v1beta1.TaskRunStatus{
+			Status: statusSuccess(),
+			TaskRunStatusFields: v1beta1.TaskRunStatusFields{
+				Steps: []v1beta1.StepState{{
+					ContainerState: corev1.ContainerState{
+						Terminated: &corev1.ContainerStateTerminated{
+							Message: `[{"key":"digest","value":"sha256:1234","resourceRef":{"name":"source-image"}},{"key":"resultName","value":"","type":1}]`,
+						}},
+					Name:          "bar",
+					ContainerName: "step-bar",
+				}},
+				Sidecars: []v1beta1.SidecarState{},
+				ResourcesResult: []v1beta1.PipelineResourceResult{{
+					Key:         "digest",
+					Value:       "sha256:1234",
+					ResourceRef: &v1beta1.PipelineResourceRef{Name: "source-image"},
+				}},
+				TaskRunResults: []v1beta1.TaskRunResult{{
+					Name:  "resultName",
+					Value: *v1beta1.NewArrayOrString(""),
+				}},
+				// We don't actually care about the time, just that it's not nil
+				CompletionTime: &metav1.Time{Time: time.Now()},
+			},
+		},
+	}, {
+		desc: "test string result",
+		podStatus: corev1.PodStatus{
+			Phase: corev1.PodSucceeded,
+			ContainerStatuses: []corev1.ContainerStatus{{
+				Name: "step-bar",
+				State: corev1.ContainerState{
+					Terminated: &corev1.ContainerStateTerminated{
+						Message: `[{"key":"resultName","value":"hello", "type":1}, {"key":"digest","value":"sha256:1234","resourceRef":{"name":"source-image"}}]`,
+					},
+				},
+			}},
+		},
+		want: v1beta1.TaskRunStatus{
+			Status: statusSuccess(),
+			TaskRunStatusFields: v1beta1.TaskRunStatusFields{
+				Steps: []v1beta1.StepState{{
+					ContainerState: corev1.ContainerState{
+						Terminated: &corev1.ContainerStateTerminated{
+							Message: `[{"key":"digest","value":"sha256:1234","resourceRef":{"name":"source-image"}},{"key":"resultName","value":"hello","type":1}]`,
+						}},
+					Name:          "bar",
+					ContainerName: "step-bar",
+				}},
+				Sidecars: []v1beta1.SidecarState{},
+				ResourcesResult: []v1beta1.PipelineResourceResult{{
+					Key:         "digest",
+					Value:       "sha256:1234",
+					ResourceRef: &v1beta1.PipelineResourceRef{Name: "source-image"},
+				}},
+				TaskRunResults: []v1beta1.TaskRunResult{{
+					Name:  "resultName",
+					Value: *v1beta1.NewArrayOrString("hello"),
+				}},
+				// We don't actually care about the time, just that it's not nil
+				CompletionTime: &metav1.Time{Time: time.Now()},
+			},
+		},
+	}, {
+		desc: "test array result",
+		podStatus: corev1.PodStatus{
+			Phase: corev1.PodSucceeded,
+			ContainerStatuses: []corev1.ContainerStatus{{
+				Name: "step-bar",
+				State: corev1.ContainerState{
+					Terminated: &corev1.ContainerStateTerminated{
+						Message: `[{"key":"resultName","value":"[\"hello\",\"world\"]", "type":1}, {"key":"digest","value":"sha256:1234","resourceRef":{"name":"source-image"}}]`,
+					},
+				},
+			}},
+		},
+		want: v1beta1.TaskRunStatus{
+			Status: statusSuccess(),
+			TaskRunStatusFields: v1beta1.TaskRunStatusFields{
+				Steps: []v1beta1.StepState{{
+					ContainerState: corev1.ContainerState{
+						Terminated: &corev1.ContainerStateTerminated{
+							Message: `[{"key":"digest","value":"sha256:1234","resourceRef":{"name":"source-image"}},{"key":"resultName","value":"[\"hello\",\"world\"]","type":1}]`,
+						}},
+					Name:          "bar",
+					ContainerName: "step-bar",
+				}},
+				Sidecars: []v1beta1.SidecarState{},
+				ResourcesResult: []v1beta1.PipelineResourceResult{{
+					Key:         "digest",
+					Value:       "sha256:1234",
+					ResourceRef: &v1beta1.PipelineResourceRef{Name: "source-image"},
+				}},
+				TaskRunResults: []v1beta1.TaskRunResult{{
+					Name:  "resultName",
+					Value: *v1beta1.NewArrayOrString("hello", "world"),
+				}},
+				// We don't actually care about the time, just that it's not nil
+				CompletionTime: &metav1.Time{Time: time.Now()},
+			},
+		},
+	}} {
+		t.Run(c.desc, func(t *testing.T) {
+			now := metav1.Now()
+			if cmp.Diff(c.pod, corev1.Pod{}) == "" {
+				c.pod = corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "pod",
+						Namespace:         "foo",
+						CreationTimestamp: now,
+					},
+					Status: c.podStatus,
+				}
+			}
+
+			startTime := time.Date(2010, 1, 1, 1, 1, 1, 1, time.UTC)
+			tr := v1beta1.TaskRun{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "task-run",
+					Namespace: "foo",
+				},
+				Status: v1beta1.TaskRunStatus{
+					TaskRunStatusFields: v1beta1.TaskRunStatusFields{
+						StartTime: &metav1.Time{Time: startTime},
+					},
+				},
+			}
+			logger, _ := logging.NewLogger("", "status")
+			got, err := MakeTaskRunStatus(ctx, logger, tr, &c.pod)
+			if err != nil {
+				t.Errorf("MakeTaskRunResult: %s", err)
+			}
+
+			// Common traits, set for test case brevity.
+			c.want.PodName = "pod"
+			c.want.StartTime = &metav1.Time{Time: startTime}
+
+			ensureTimeNotNil := cmp.Comparer(func(x, y *metav1.Time) bool {
+				if x == nil {
+					return y == nil
+				}
+				return y != nil
+			})
+			if d := cmp.Diff(c.want, got, ignoreVolatileTime, ensureTimeNotNil); d != "" {
+				t.Errorf("Diff %s", diff.PrintWantGot(d))
+			}
+			if tr.Status.StartTime.Time != c.want.StartTime.Time {
+				t.Errorf("Expected TaskRun startTime to be unchanged but was %s", tr.Status.StartTime)
+			}
+		})
+	}
+
 }
 
 func TestMakeRunStatusJSONError(t *testing.T) {
@@ -1134,9 +1314,9 @@ func TestMakeRunStatusJSONError(t *testing.T) {
 			Namespace: "foo",
 		},
 	}
-
+	ctx := context.Background()
 	logger, _ := logging.NewLogger("", "status")
-	gotTr, err := MakeTaskRunStatus(logger, tr, pod)
+	gotTr, err := MakeTaskRunStatus(ctx, logger, tr, pod)
 	if err == nil {
 		t.Error("Expected error, got nil")
 	}

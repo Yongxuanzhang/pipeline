@@ -39,7 +39,7 @@ type TaskRunResult struct {
 	Type ResultsType `json:"type,omitempty"`
 
 	// Value the given value of the result
-	Value string `json:"value"`
+	Value ArrayOrString `json:"value"`
 }
 
 // ResultsType indicates the type of a result;
@@ -47,7 +47,6 @@ type TaskRunResult struct {
 // Note that there is ResultType used to find out whether a
 // PipelineResourceResult is from a task result or not, which is different from
 // this ResultsType.
-// TODO(#4723): add "array" and "object" support
 // TODO(#4723): align ResultsType and ParamType in ArrayOrString
 type ResultsType string
 

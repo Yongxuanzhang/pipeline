@@ -298,6 +298,7 @@ func TestArrayOrString_UnmarshalJSON_Directly(t *testing.T) {
 		{desc: "nested array", input: `[1,\"2\",3]`, expected: *v1beta1.NewArrayOrString(`[1,\"2\",3]`)},
 		{desc: "string value", input: `hello`, expected: *v1beta1.NewArrayOrString("hello")},
 		{desc: "array value", input: `["hello","world"]`, expected: *v1beta1.NewArrayOrString("hello", "world")},
+		{desc: "object value", input: `{"key1": "val1", "key2": "val2"}`, expected: v1beta1.ArrayOrString{Type: v1beta1.ParamTypeObject, ObjectVal: map[string]string{"key1": "val1", "key2": "val2"}}},
 	}
 
 	for _, c := range cases {

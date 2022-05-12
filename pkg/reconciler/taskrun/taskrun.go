@@ -459,7 +459,11 @@ func (c *Reconciler) reconcile(ctx context.Context, tr *v1beta1.TaskRun, rtr *re
 	if err != nil {
 		return err
 	}
-	// TODO(#4723): Validate the taskrun results against taskresults for object val
+
+	// When get the results, for object value need to check if they have missing keys.
+	if missingKeysObjectNames := missingKeyObjectResults(tr); len(missingKeysObjectNames) != 0 {
+		return fmt.Errorf("missing keys for these results which are required in TaskResult's properties %v", missingKeysObjectNames)
+	}
 
 	logger.Infof("Successfully reconciled taskrun %s/%s with status: %#v", tr.Name, tr.Namespace, tr.Status.GetCondition(apis.ConditionSucceeded))
 	return nil
@@ -828,4 +832,27 @@ func willOverwritePodSetAffinity(taskRun *v1beta1.TaskRun) bool {
 		podTemplate = *taskRun.Spec.PodTemplate
 	}
 	return taskRun.Annotations[workspace.AnnotationAffinityAssistantName] != "" && podTemplate.Affinity != nil
+}
+
+func missingKeyObjectResults(tr *v1beta1.TaskRun) []string {
+	neededKeys := make(map[string][]string)
+	providedKeys := make(map[string][]string)
+	// collect needed keys for object parameters
+	for _, tr := range tr.Spec.TaskSpec.Results {
+		if string(tr.Type) == string(v1beta1.ParamTypeObject) {
+			for key := range tr.Properties {
+				neededKeys[tr.Name] = append(neededKeys[tr.Name], key)
+			}
+		}
+	}
+
+	// collect provided keys for object parameters
+	for _, trr := range tr.Status.TaskRunResults {
+		if trr.Value.Type == v1beta1.ParamTypeObject {
+			for key := range trr.Value.ObjectVal {
+				neededKeys[trr.Name] = append(neededKeys[trr.Name], key)
+			}
+		}
+	}
+	return validateObjectKeys(neededKeys, providedKeys)
 }

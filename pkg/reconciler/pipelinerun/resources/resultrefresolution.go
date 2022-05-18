@@ -151,10 +151,12 @@ func resolveResultRef(pipelineState PipelineRunState, resultRef *v1beta1.ResultR
 	} else {
 		taskRunName = referencedPipelineTask.TaskRun.Name
 		resultValue, err = findTaskResultForParam(referencedPipelineTask.TaskRun, resultRef)
+		fmt.Println("!!!resolveResultRef resultValue", resultValue)
 		if err != nil {
 			return nil, resultRef.PipelineTask, err
 		}
 	}
+
 
 	return &ResolvedResultRef{
 		Value:           resultValue,
@@ -187,10 +189,27 @@ func findTaskResultForParam(taskRun *v1beta1.TaskRun, reference *v1beta1.ResultR
 func (rs ResolvedResultRefs) getStringReplacements() map[string]string {
 	replacements := map[string]string{}
 	for _, r := range rs {
-		for _, target := range r.getReplaceTarget() {
-			replacements[target] = r.Value.StringVal
+		if r.Value.Type == v1beta1.ParamType(v1beta1.ResultsTypeString) {
+			for _, target := range r.getReplaceTarget() {
+				replacements[target] = r.Value.StringVal
+			}
 		}
 	}
+	return replacements
+}
+
+func (rs ResolvedResultRefs) getArrayReplacements() map[string][]string {
+	replacements := map[string][]string{}
+	for _, r := range rs {
+		fmt.Println("!!!!getArrayReplacements r", r)
+		fmt.Println("!!!!getArrayReplacements r.Value", r.Value)
+		if r.Value.Type == v1beta1.ParamType(v1beta1.ResultsTypeArray) {
+			for _, target := range r.getReplaceTarget() {
+				replacements[target] = r.Value.ArrayVal
+			}
+		}
+	}
+	fmt.Println("!!!!getArrayReplacements",replacements)
 	return replacements
 }
 

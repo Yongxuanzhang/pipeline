@@ -98,18 +98,24 @@ func ApplyPipelineTaskContexts(pt *v1beta1.PipelineTask) *v1beta1.PipelineTask {
 
 // ApplyTaskResults applies the ResolvedResultRef to each PipelineTask.Params and Pipeline.WhenExpressions in targets
 func ApplyTaskResults(targets PipelineRunState, resolvedResultRefs ResolvedResultRefs) {
+	fmt.Println("!!!!!ApplyTaskResults")
 	stringReplacements := resolvedResultRefs.getStringReplacements()
+	arrayReplacements := resolvedResultRefs.getArrayReplacements()
+	fmt.Println("!!!!!ApplyTaskResults stringReplacements",stringReplacements)
+	fmt.Println("!!!!!ApplyTaskResults arrayReplacements",arrayReplacements)
 	for _, resolvedPipelineRunTask := range targets {
 		// also make substitution for resolved condition checks
 		for _, resolvedConditionCheck := range resolvedPipelineRunTask.ResolvedConditionChecks {
 			pipelineTaskCondition := resolvedConditionCheck.PipelineTaskCondition.DeepCopy()
-			pipelineTaskCondition.Params = replaceParamValues(pipelineTaskCondition.Params, stringReplacements, nil)
+			pipelineTaskCondition.Params = replaceParamValues(pipelineTaskCondition.Params, stringReplacements, arrayReplacements)
 			resolvedConditionCheck.PipelineTaskCondition = pipelineTaskCondition
 		}
 		if resolvedPipelineRunTask.PipelineTask != nil {
 			pipelineTask := resolvedPipelineRunTask.PipelineTask.DeepCopy()
-			pipelineTask.Params = replaceParamValues(pipelineTask.Params, stringReplacements, nil)
-			pipelineTask.WhenExpressions = pipelineTask.WhenExpressions.ReplaceWhenExpressionsVariables(stringReplacements, nil)
+			fmt.Println("!!!!!ApplyTaskResults pipelineTask.Params before",pipelineTask.Params)
+			pipelineTask.Params = replaceParamValues(pipelineTask.Params, stringReplacements, arrayReplacements)
+			fmt.Println("!!!!!ApplyTaskResults pipelineTask.Params after",pipelineTask.Params)
+			pipelineTask.WhenExpressions = pipelineTask.WhenExpressions.ReplaceWhenExpressionsVariables(stringReplacements, arrayReplacements)
 			resolvedPipelineRunTask.PipelineTask = pipelineTask
 		}
 	}

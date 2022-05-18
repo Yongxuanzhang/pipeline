@@ -482,6 +482,8 @@ func (c *Reconciler) reconcile(ctx context.Context, pr *v1beta1.PipelineRun, get
 
 	for _, rprt := range pipelineRunFacts.State {
 		if !rprt.IsCustomTask() {
+			fmt.Println("!!!!pr reconcile")
+			fmt.Println("!!!!pr reconcile rprt.PipelineTask.Params",rprt.PipelineTask.Params)
 			err := taskrun.ValidateResolvedTaskResources(ctx, rprt.PipelineTask.Params, rprt.PipelineTask.Matrix, rprt.ResolvedTaskResources)
 			if err != nil {
 				logger.Errorf("Failed to validate pipelinerun %q with error %v", pr.Name, err)
@@ -634,8 +636,9 @@ func (c *Reconciler) runNextSchedulableTask(ctx context.Context, pr *v1beta1.Pip
 		logger.Errorf("Error getting potential next tasks for valid pipelinerun %s: %v", pr.Name, err)
 		return controller.NewPermanentError(err)
 	}
-
+	fmt.Println("!!!runNextSchedulableTask pipelineRunFacts.State", pipelineRunFacts.State)
 	resolvedResultRefs, _, err := resources.ResolveResultRefs(pipelineRunFacts.State, nextRprts)
+	fmt.Println("!!!runNextSchedulableTask resolvedResultRefs", resolvedResultRefs)
 	if err != nil {
 		logger.Infof("Failed to resolve task result reference for %q with error %v", pr.Name, err)
 		pr.Status.MarkFailed(ReasonInvalidTaskResultReference, err.Error())

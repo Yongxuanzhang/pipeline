@@ -193,6 +193,7 @@ func (arrayOrString ArrayOrString) MarshalJSON() ([]byte, error) {
 
 // ApplyReplacements applyes replacements for ArrayOrString type
 func (arrayOrString *ArrayOrString) ApplyReplacements(stringReplacements map[string]string, arrayReplacements map[string][]string) {
+	fmt.Println("!!!ApplyReplacements arrayOrString", arrayOrString)
 	if arrayOrString.Type == ParamTypeString {
 		arrayOrString.StringVal = substitution.ApplyReplacements(arrayOrString.StringVal, stringReplacements)
 	} else {
@@ -201,6 +202,8 @@ func (arrayOrString *ArrayOrString) ApplyReplacements(stringReplacements map[str
 			newArrayVal = append(newArrayVal, substitution.ApplyArrayReplacements(v, stringReplacements, arrayReplacements)...)
 		}
 		arrayOrString.ArrayVal = newArrayVal
+
+		fmt.Println("!!!ApplyReplacements arrayOrString after", arrayOrString)
 	}
 }
 

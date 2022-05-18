@@ -134,12 +134,14 @@ func extraParamsNames(ctx context.Context, neededParams []string, providedParams
 
 func wrongTypeParamsNames(params []v1beta1.Param, matrix []v1beta1.Param, neededParamsTypes map[string]v1beta1.ParamType) []string {
 	var wrongTypeParamNames []string
+	fmt.Println("!!!wrongTypeParamsNames neededParamsTypes",neededParamsTypes)
 	for _, param := range params {
 		if _, ok := neededParamsTypes[param.Name]; !ok {
 			// Ignore any missing params - this happens when extra params were
 			// passed to the task that aren't being used.
 			continue
 		}
+		fmt.Println("!!!wrongTypeParamsNames param.Value",param.Value)
 		if param.Value.Type != neededParamsTypes[param.Name] {
 			wrongTypeParamNames = append(wrongTypeParamNames, param.Name)
 		}

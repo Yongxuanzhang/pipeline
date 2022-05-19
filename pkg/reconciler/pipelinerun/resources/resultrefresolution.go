@@ -215,6 +215,9 @@ func (rs ResolvedResultRefs) getArrayReplacements() map[string][]string {
 
 func (r *ResolvedResultRef) getReplaceTarget() []string {
 	return []string{
+		fmt.Sprintf("%s.%s.%s.%s[*]", v1beta1.ResultTaskPart, r.ResultReference.PipelineTask, v1beta1.ResultResultPart, r.ResultReference.Result),
+		fmt.Sprintf("%s.%s.%s[%q][*]", v1beta1.ResultTaskPart, r.ResultReference.PipelineTask, v1beta1.ResultResultPart, r.ResultReference.Result),
+		fmt.Sprintf("%s.%s.%s['%s'][*]", v1beta1.ResultTaskPart, r.ResultReference.PipelineTask, v1beta1.ResultResultPart, r.ResultReference.Result),
 		fmt.Sprintf("%s.%s.%s.%s", v1beta1.ResultTaskPart, r.ResultReference.PipelineTask, v1beta1.ResultResultPart, r.ResultReference.Result),
 		fmt.Sprintf("%s.%s.%s[%q]", v1beta1.ResultTaskPart, r.ResultReference.PipelineTask, v1beta1.ResultResultPart, r.ResultReference.Result),
 		fmt.Sprintf("%s.%s.%s['%s']", v1beta1.ResultTaskPart, r.ResultReference.PipelineTask, v1beta1.ResultResultPart, r.ResultReference.Result),

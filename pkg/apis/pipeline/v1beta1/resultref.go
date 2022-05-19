@@ -35,13 +35,16 @@ const (
 	// ResultResultPart Constant used to define the "results" part of a pipeline result reference
 	ResultResultPart = "results"
 	// TODO(#2462) use one regex across all substitutions
-	variableSubstitutionFormat = `\$\([_a-zA-Z0-9.-]+(\.[_a-zA-Z0-9.-]+)*\)`
+	variableSubstitutionFormat = `\$\([_a-zA-Z0-9.-]+(\.[_a-zA-Z0-9.-]+)*(\[([0-9])*\*?\])?\)`
+	// excludeArrayIndexing will replace all `[int]` and `[*]` for extracting result name
+	excludeArrayIndexingFormat = `\[([0-9])*\*?\]`
 	// ResultNameFormat Constant used to define the the regex Result.Name should follow
 	ResultNameFormat = `^([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]$`
 )
 
-var variableSubstitutionRegex = regexp.MustCompile(variableSubstitutionFormat)
+var VariableSubstitutionRegex = regexp.MustCompile(variableSubstitutionFormat)
 var resultNameFormatRegex = regexp.MustCompile(ResultNameFormat)
+var excludeArrayIndexingRegex = regexp.MustCompile(excludeArrayIndexingFormat)
 
 // NewResultRefs extracts all ResultReferences from a param or a pipeline result.
 // If the ResultReference can be extracted, they are returned. Expressions which are not
@@ -107,7 +110,7 @@ func GetVarSubstitutionExpressionsForPipelineResult(result PipelineResult) ([]st
 }
 
 func validateString(value string) []string {
-	expressions := variableSubstitutionRegex.FindAllString(value, -1)
+	expressions := VariableSubstitutionRegex.FindAllString(value, -1)
 	if expressions == nil {
 		return nil
 	}
@@ -127,6 +130,7 @@ func parseExpression(substitutionExpression string) (string, string, error) {
 	if len(subExpressions) != 4 || subExpressions[0] != ResultTaskPart || subExpressions[2] != ResultResultPart {
 		return "", "", fmt.Errorf("Must be of the form %q", resultExpressionFormat)
 	}
+	subExpressions[3] = excludeArrayIndexingRegex.ReplaceAllString(subExpressions[3], "")
 	return subExpressions[1], subExpressions[3], nil
 }
 

@@ -79,17 +79,16 @@ func validateParams(ctx context.Context, paramSpecs []v1beta1.ParamSpec, params 
 		return fmt.Errorf("didn't need these params but they were provided anyway: %s", extraParamsNames)
 	}
 	for i :=0; i<len(params); i++{
+		/*
 		fmt.Println("!!!match name format",v1beta1.VariableSubstitutionRegex.MatchString(params[i].Value.StringVal))
 		fmt.Println("!!!string val",params[i].Value.StringVal)
 		fmt.Println("!!!params[i].Value.Type",params[i].Value.Type)
 		fmt.Println("!!!neededParamsTypes[params[i].Name]",neededParamsTypes[params[i].Name])
-		// todo: fix this condition
-		if params[i].Value.Type == "string" && neededParamsTypes[params[i].Name] == "array" && v1beta1.VariableSubstitutionRegex.MatchString(params[i].Name){
-			fmt.Println("!!!I'm here")
+		*/
+		if params[i].Value.Type == "string" && neededParamsTypes[params[i].Name] == "array" && v1beta1.VariableSubstitutionRegex.MatchString(params[i].Value.StringVal){
 			params[i].Value.Type = neededParamsTypes[params[i].Name]
 			params[i].Value.ArrayVal = []string{params[i].Value.StringVal}
 			params[i].Value.StringVal = ""
-
 		}
 	}
 	if wrongTypeParamNames := wrongTypeParamsNames(params, matrix, neededParamsTypes); len(wrongTypeParamNames) != 0 {
@@ -220,6 +219,7 @@ func validateObjectKeys(neededObjectKeys, providedObjectKeys map[string][]string
 
 // ValidateResolvedTaskResources validates task inputs, params and output matches taskrun
 func ValidateResolvedTaskResources(ctx context.Context, params []v1beta1.Param, matrix []v1beta1.Param, rtr *resources.ResolvedTaskResources) error {
+	fmt.Println("!!!rtr.TaskSpec.Results",rtr.TaskSpec.Results)
 	if err := validateParams(ctx, rtr.TaskSpec.Params, params, matrix); err != nil {
 		return fmt.Errorf("invalid input params for task %s: %w", rtr.TaskName, err)
 	}

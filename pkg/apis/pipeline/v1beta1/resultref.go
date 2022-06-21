@@ -25,10 +25,11 @@ import (
 
 // ResultRef is a type that represents a reference to a task run result
 type ResultRef struct {
-	PipelineTask string `json:"pipelineTask"`
-	Result       string `json:"result"`
-	ResultsIndex int    `json:"resultsIndex"`
-	Property     string `json:"property"`
+	PipelineTask string    `json:"pipelineTask"`
+	Result       string    `json:"result"`
+	ResultsIndex int       `json:"resultsIndex"`
+	Property     string    `json:"property"`
+	ParamType    ParamType `json:"paramType"`
 }
 
 const (
@@ -198,11 +199,29 @@ func ParseResultName(resultName string) (string, string) {
 
 // PipelineTaskResultRefs walks all the places a result reference can be used
 // in a PipelineTask and returns a list of any references that are found.
-func PipelineTaskResultRefs(pt *PipelineTask) []*ResultRef {
+func PipelineTaskResultRefs(pt *PipelineTask, resolvedParamSpec []ParamSpec) []*ResultRef {
 	refs := []*ResultRef{}
+	// pmap collects the params types defined in spec
+	pmap := make(map[string]ParamType)
+	if pt.TaskSpec != nil {
+		for _, p := range pt.TaskSpec.Params {
+			pmap[p.Name] = p.Type
+		}
+	}
+	if len(resolvedParamSpec) != 0 {
+		for _, p := range resolvedParamSpec {
+			pmap[p.Name] = p.Type
+		}
+	}
 	for _, p := range append(pt.Params, pt.Matrix...) {
 		expressions, _ := GetVarSubstitutionExpressionsForParam(p)
-		refs = append(refs, NewResultRefs(expressions)...)
+		rfs := NewResultRefs(expressions)
+		// if the param's string value holds the reference to result, e.g. $(tasks.taskName.results.resultName)
+		// store the ParamType in result ref, string value should have only 1 ref.
+		if p.Value.Type == ParamTypeString && len(rfs) != 0 {
+			rfs[0].ParamType = pmap[p.Name]
+		}
+		refs = append(refs, rfs...)
 	}
 
 	for _, whenExpression := range pt.WhenExpressions {

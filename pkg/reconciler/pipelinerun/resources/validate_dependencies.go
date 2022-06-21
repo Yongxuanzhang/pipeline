@@ -30,7 +30,12 @@ import (
 func ValidatePipelineTaskResults(state PipelineRunState) error {
 	ptMap := state.ToMap()
 	for _, rpt := range state {
-		for _, ref := range v1beta1.PipelineTaskResultRefs(rpt.PipelineTask) {
+		// collect the resolved params for later update resultrefs
+		var rp []v1beta1.ParamSpec
+		if ptMap[rpt.PipelineTask.Name].ResolvedTaskResources != nil && ptMap[rpt.PipelineTask.Name].ResolvedTaskResources.TaskSpec != nil {
+			rp = ptMap[rpt.PipelineTask.Name].ResolvedTaskResources.TaskSpec.Params
+		}
+		for _, ref := range v1beta1.PipelineTaskResultRefs(rpt.PipelineTask, rp) {
 			if err := validateResultRef(ref, ptMap); err != nil {
 				return fmt.Errorf("invalid result reference in pipeline task %q: %s", rpt.PipelineTask.Name, err)
 			}
@@ -75,6 +80,10 @@ func validateResultRef(ref *v1beta1.ResultRef, ptMap map[string]*ResolvedPipelin
 		return fmt.Errorf("unable to validate result referencing pipeline task %q: task spec not found", ref.PipelineTask)
 	}
 	for _, taskResult := range ptMap[ref.PipelineTask].ResolvedTaskResources.TaskSpec.Results {
+		// if the ref is from param we need to check if the paramType matches referred result type
+		if ref.ParamType != "" && taskResult.Type != v1beta1.ResultsType(ref.ParamType) {
+			return fmt.Errorf("param type: %q doesn't match refered result: %q type: %q", v1beta1.ResultsType(ref.ParamType), taskResult.Name, taskResult.Type)
+		}
 		if taskResult.Name == ref.Result {
 			taskProvidesResult = true
 			break

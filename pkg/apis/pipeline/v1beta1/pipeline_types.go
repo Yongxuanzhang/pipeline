@@ -360,7 +360,7 @@ func (pt *PipelineTask) GetMatrixCombinationsCount() int {
 }
 
 func (pt *PipelineTask) validateResultsFromMatrixedPipelineTasksNotConsumed(matrixedPipelineTasks sets.String) (errs *apis.FieldError) {
-	for _, ref := range PipelineTaskResultRefs(pt) {
+	for _, ref := range PipelineTaskResultRefs(pt, nil) {
 		if matrixedPipelineTasks.Has(ref.PipelineTask) {
 			errs = errs.Also(apis.ErrInvalidValue(fmt.Sprintf("consuming results from matrixed task %s is not allowed", ref.PipelineTask), ""))
 		}
@@ -537,7 +537,7 @@ func (pt PipelineTask) resourceDeps() []string {
 	}
 
 	// Add any dependents from result references.
-	for _, ref := range PipelineTaskResultRefs(&pt) {
+	for _, ref := range PipelineTaskResultRefs(&pt, nil) {
 		resourceDeps = append(resourceDeps, ref.PipelineTask)
 	}
 

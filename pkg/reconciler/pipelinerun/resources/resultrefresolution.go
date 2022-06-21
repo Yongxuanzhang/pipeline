@@ -131,7 +131,7 @@ func removeDup(refs ResolvedResultRefs) ResolvedResultRefs {
 // then a nil list and error is returned instead.
 func convertToResultRefs(pipelineRunState PipelineRunState, target *ResolvedPipelineTask) (ResolvedResultRefs, string, error) {
 	var resolvedResultRefs ResolvedResultRefs
-	for _, ref := range v1beta1.PipelineTaskResultRefs(target.PipelineTask) {
+	for _, ref := range v1beta1.PipelineTaskResultRefs(target.PipelineTask, nil) {
 		resolved, pt, err := resolveResultRef(pipelineRunState, ref)
 		if err != nil {
 			return nil, pt, err

@@ -658,7 +658,7 @@ func TestPipelineTaskResultRefs(t *testing.T) {
 			Value: *v1beta1.NewArrayOrString("$(tasks.pt7.results.r7)", "$(tasks.pt8.results.r8)"),
 		}},
 	}
-	refs := v1beta1.PipelineTaskResultRefs(&pt)
+	refs := v1beta1.PipelineTaskResultRefs(&pt, nil)
 	expectedRefs := []*v1beta1.ResultRef{{
 		PipelineTask: "pt1",
 		Result:       "r1",

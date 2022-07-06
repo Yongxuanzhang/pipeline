@@ -1001,7 +1001,28 @@ results:
 
 For an end-to-end example, see [`Results` in a `PipelineRun`](../examples/v1beta1/pipelineruns/pipelinerun-results.yaml).
 
-Array results is supported as alpha feature, see [`Array Results` in a `PipelineRun`](../examples/v1beta1/pipelineruns/alpha/pipelinerun-array-results.yaml).
+Array and object results is supported as alpha feature, see [`Array Results` in a `PipelineRun`](../examples/v1beta1/pipelineruns/alpha/pipeline-emitting-results.yaml).
+
+```yaml
+    results:
+      - name: array-results
+        type: array
+        description: whole array
+        value: $(tasks.task1.results.array-results[*])
+      - name: array-indexing-results
+        type: string
+        description: array element
+        value: $(tasks.task1.results.array-results[1])
+      - name: object-results
+        type: object
+        description: whole object
+        value: $(tasks.task2.results.object-results[*])
+      - name: object-element
+        type: string
+        description: object element
+        value: $(tasks.task2.results.object-results.foo)
+```
+
 
 A `Pipeline Result` is not emitted if any of the following are true:
 - A `PipelineTask` referenced by the `Pipeline Result` failed. The `PipelineRun` will also

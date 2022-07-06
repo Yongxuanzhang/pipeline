@@ -2099,6 +2099,111 @@ func TestApplyTaskResultsToPipelineResults(t *testing.T) {
 			Value: *v1beta1.NewArrayOrString("rae"),
 		}},
 	}, {
+		description: "apply-object-results",
+		results: []v1beta1.PipelineResult{{
+			Name:  "pipeline-result-1",
+			Value: *v1beta1.NewArrayOrString("$(tasks.pt1.results.foo[*])"),
+		}},
+		taskResults: map[string][]v1beta1.TaskRunResult{
+			"pt1": {
+				{
+					Name: "foo",
+					Value: *v1beta1.NewObject(map[string]string{
+						"key1": "val1",
+						"key2": "val2",
+					}),
+				},
+			},
+		},
+		expected: []v1beta1.PipelineRunResult{{
+			Name: "pipeline-result-1",
+			Value: *v1beta1.NewObject(map[string]string{
+				"key1": "val1",
+				"key2": "val2",
+			}),
+		}},
+	}, {
+		description: "object-results-from-array-indexing-and-object-element",
+		results: []v1beta1.PipelineResult{{
+			Name: "pipeline-result-1",
+			Value: *v1beta1.NewObject(map[string]string{
+				"pkey1": "$(tasks.pt1.results.foo.key1)",
+				"pkey2": "$(tasks.pt2.results.bar[1])",
+			}),
+		}},
+		taskResults: map[string][]v1beta1.TaskRunResult{
+			"pt1": {
+				{
+					Name: "foo",
+					Value: *v1beta1.NewObject(map[string]string{
+						"key1": "val1",
+						"key2": "val2",
+					}),
+				},
+			},
+			"pt2": {
+				{
+					Name:  "bar",
+					Value: *v1beta1.NewArrayOrString("do", "rae", "mi"),
+				},
+			},
+		},
+		expected: []v1beta1.PipelineRunResult{{
+			Name: "pipeline-result-1",
+			Value: *v1beta1.NewObject(map[string]string{
+				"pkey1": "val1",
+				"pkey2": "rae",
+			}),
+		}},
+	}, {
+		description: "array-results-from-array-indexing-and-object-element",
+		results: []v1beta1.PipelineResult{{
+			Name:  "pipeline-result-1",
+			Value: *v1beta1.NewArrayOrString("$(tasks.pt1.results.foo.key1)", "$(tasks.pt2.results.bar[1])"),
+		}},
+		taskResults: map[string][]v1beta1.TaskRunResult{
+			"pt1": {
+				{
+					Name: "foo",
+					Value: *v1beta1.NewObject(map[string]string{
+						"key1": "val1",
+						"key2": "val2",
+					}),
+				},
+			},
+			"pt2": {
+				{
+					Name:  "bar",
+					Value: *v1beta1.NewArrayOrString("do", "rae", "mi"),
+				},
+			},
+		},
+		expected: []v1beta1.PipelineRunResult{{
+			Name:  "pipeline-result-1",
+			Value: *v1beta1.NewArrayOrString("val1", "rae"),
+		}},
+	}, {
+		description: "apply-object-element",
+		results: []v1beta1.PipelineResult{{
+			Name:  "pipeline-result-1",
+			Value: *v1beta1.NewArrayOrString("$(tasks.pt1.results.foo.key1)"),
+		}},
+		taskResults: map[string][]v1beta1.TaskRunResult{
+			"pt1": {
+				{
+					Name: "foo",
+					Value: *v1beta1.NewObject(map[string]string{
+						"key1": "val1",
+						"key2": "val2",
+					}),
+				},
+			},
+		},
+		expected: []v1beta1.PipelineRunResult{{
+			Name:  "pipeline-result-1",
+			Value: *v1beta1.NewArrayOrString("val1"),
+		}},
+	}, {
 		description: "multiple-array-results-multiple-successful-tasks ",
 		results: []v1beta1.PipelineResult{{
 			Name:  "pipeline-result-1",

@@ -30,6 +30,14 @@ import (
 	"github.com/tektoncd/pipeline/pkg/substitution"
 )
 
+const (
+	// resultsParseNumber is the value of how many parts we split from result reference. e.g.  tasks.<taskName>.results.<objectResultName>
+	resultsParseNumber = 4
+	// objectElementResultsParseNumber is the value of how many parts we split from
+	// object attribute result reference. e.g.  tasks.<taskName>.results.<objectResultName>.<individualAttribute>
+	objectElementResultsParseNumber = 5
+)
+
 // ApplyParameters applies the params from a PipelineRun.Params to a PipelineSpec.
 func ApplyParameters(ctx context.Context, p *v1beta1.PipelineSpec, pr *v1beta1.PipelineRun) *v1beta1.PipelineSpec {
 	// This assumes that the PipelineRun inputs have been validated against what the Pipeline requests.
@@ -252,10 +260,13 @@ func ApplyTaskResultsToPipelineResults(
 	results []v1beta1.PipelineResult,
 	taskRunResults map[string][]v1beta1.TaskRunResult,
 	customTaskResults map[string][]v1alpha1.RunResult) []v1beta1.PipelineRunResult {
-
+	// TODO(#4723): Validate array and object results. For array indexing reference validate the index is not out of bound,
+	// for object reference validate the key is in the dictionary.
+	// TODO(#4723): Test from pipelinerun reconciler
 	var runResults []v1beta1.PipelineRunResult
 	stringReplacements := map[string]string{}
 	arrayReplacements := map[string][]string{}
+	objectReplacements := map[string]map[string]string{}
 	for _, pipelineResult := range results {
 		variablesInPipelineResult, _ := v1beta1.GetVarSubstitutionExpressionsForPipelineResult(pipelineResult)
 		validPipelineResult := true
@@ -266,10 +277,19 @@ func ApplyTaskResultsToPipelineResults(
 			if _, isMemoized := arrayReplacements[variable]; isMemoized {
 				continue
 			}
-			// TODO(#4723): Need to consider object case.
-			// e.g.: tasks.taskname.results.resultname.objectkey
+			if _, isMemoized := objectReplacements[variable]; isMemoized {
+				continue
+			}
 			variableParts := strings.Split(variable, ".")
-			if len(variableParts) == 4 && variableParts[0] == "tasks" && variableParts[2] == "results" {
+			if variableParts[0] != v1beta1.ResultTaskPart || variableParts[2] != v1beta1.ResultResultPart {
+				validPipelineResult = false
+				continue
+			}
+			switch len(variableParts) {
+			// For string result: tasks.<taskName>.results.<objectResultName>
+			// For array result: tasks.<taskName>.results.<objectResultName>[*], tasks.<taskName>.results.<objectResultName>[i]
+			// For object result: tasks.<taskName>.results.<objectResultName>[*],
+			case resultsParseNumber:
 				taskName, resultName := variableParts[1], variableParts[3]
 				resultName, stringIdx := v1beta1.ParseResultName(resultName)
 				if resultValue := taskResultValue(taskName, resultName, taskRunResults); resultValue != nil {
@@ -283,19 +303,28 @@ func ApplyTaskResultsToPipelineResults(
 						} else {
 							arrayReplacements[v1beta1.StripStarVarSubExpression(variable)] = resultValue.ArrayVal
 						}
+					case v1beta1.ParamTypeObject:
+						objectReplacements[v1beta1.StripStarVarSubExpression(variable)] = resultValue.ObjectVal
 					}
 				} else if resultValue := runResultValue(taskName, resultName, customTaskResults); resultValue != nil {
 					stringReplacements[variable] = *resultValue
 				} else {
 					validPipelineResult = false
 				}
-			} else {
+			// For object type result: tasks.<taskName>.results.<objectResultName>.<individualAttribute>
+			case objectElementResultsParseNumber:
+				taskName, resultName, objectKey := variableParts[1], variableParts[3], variableParts[4]
+				resultName, _ = v1beta1.ParseResultName(resultName)
+				if resultValue := taskResultValue(taskName, resultName, taskRunResults); resultValue != nil {
+					stringReplacements[variable] = resultValue.ObjectVal[objectKey]
+				}
+			default:
 				validPipelineResult = false
 			}
 		}
 		if validPipelineResult {
 			finalValue := pipelineResult.Value
-			finalValue.ApplyReplacements(stringReplacements, arrayReplacements, nil)
+			finalValue.ApplyReplacements(stringReplacements, arrayReplacements, objectReplacements)
 			runResults = append(runResults, v1beta1.PipelineRunResult{
 				Name:  pipelineResult.Name,
 				Value: finalValue,

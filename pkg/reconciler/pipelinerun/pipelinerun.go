@@ -614,10 +614,10 @@ func (c *Reconciler) reconcile(ctx context.Context, pr *v1beta1.PipelineRun, get
 	if after.Status == corev1.ConditionTrue {
 		pr.Status.PipelineResults, err = resources.ApplyTaskResultsToPipelineResults(pipelineSpec.Results,
 			pipelineRunFacts.State.GetTaskRunsResults(), pipelineRunFacts.State.GetRunsResults())
-			if err != nil{
-				pr.Status.MarkFailed(ReasonFailedValidation, err.Error())
-				return err
-			}
+		if err != nil {
+			pr.Status.MarkFailed(ReasonFailedValidation, err.Error())
+			return err
+		}
 	}
 
 	logger.Infof("PipelineRun %s status is being set to %s", pr.Name, after)

@@ -259,16 +259,17 @@ func replaceParamValues(params []v1beta1.Param, stringReplacements map[string]st
 func ApplyTaskResultsToPipelineResults(
 	results []v1beta1.PipelineResult,
 	taskRunResults map[string][]v1beta1.TaskRunResult,
-	customTaskResults map[string][]v1alpha1.RunResult) []v1beta1.PipelineRunResult {
-	// TODO(#4723): Validate array and object results. For array indexing reference validate the index is not out of bound,
-	// for object reference validate the key is in the dictionary.
-	// TODO(#4723): Test from pipelinerun reconciler
+	customTaskResults map[string][]v1alpha1.RunResult) ([]v1beta1.PipelineRunResult, error) {
 	var runResults []v1beta1.PipelineRunResult
+	var invalidPipelineResults []string
 	stringReplacements := map[string]string{}
 	arrayReplacements := map[string][]string{}
 	objectReplacements := map[string]map[string]string{}
 	for _, pipelineResult := range results {
 		variablesInPipelineResult, _ := v1beta1.GetVarSubstitutionExpressionsForPipelineResult(pipelineResult)
+		if len(variablesInPipelineResult) == 0 {
+			continue
+		}
 		validPipelineResult := true
 		for _, variable := range variablesInPipelineResult {
 			if _, isMemoized := stringReplacements[variable]; isMemoized {
@@ -283,6 +284,7 @@ func ApplyTaskResultsToPipelineResults(
 			variableParts := strings.Split(variable, ".")
 			if variableParts[0] != v1beta1.ResultTaskPart || variableParts[2] != v1beta1.ResultResultPart {
 				validPipelineResult = false
+				invalidPipelineResults = append(invalidPipelineResults, pipelineResult.Name)
 				continue
 			}
 			switch len(variableParts) {
@@ -299,7 +301,12 @@ func ApplyTaskResultsToPipelineResults(
 					case v1beta1.ParamTypeArray:
 						if stringIdx != "*" {
 							intIdx, _ := strconv.Atoi(stringIdx)
-							stringReplacements[variable] = resultValue.ArrayVal[intIdx]
+							if intIdx < len(resultValue.ArrayVal) {
+								stringReplacements[variable] = resultValue.ArrayVal[intIdx]
+							} else {
+								invalidPipelineResults = append(invalidPipelineResults, pipelineResult.Name)
+								validPipelineResult = false
+							}
 						} else {
 							arrayReplacements[v1beta1.StripStarVarSubExpression(variable)] = resultValue.ArrayVal
 						}
@@ -309,6 +316,8 @@ func ApplyTaskResultsToPipelineResults(
 				} else if resultValue := runResultValue(taskName, resultName, customTaskResults); resultValue != nil {
 					stringReplacements[variable] = *resultValue
 				} else {
+					// referred array index out of bound
+					invalidPipelineResults = append(invalidPipelineResults, pipelineResult.Name)
 					validPipelineResult = false
 				}
 			// For object type result: tasks.<taskName>.results.<objectResultName>.<individualAttribute>
@@ -316,9 +325,16 @@ func ApplyTaskResultsToPipelineResults(
 				taskName, resultName, objectKey := variableParts[1], variableParts[3], variableParts[4]
 				resultName, _ = v1beta1.ParseResultName(resultName)
 				if resultValue := taskResultValue(taskName, resultName, taskRunResults); resultValue != nil {
-					stringReplacements[variable] = resultValue.ObjectVal[objectKey]
+					if _, ok := resultValue.ObjectVal[objectKey]; ok {
+						stringReplacements[variable] = resultValue.ObjectVal[objectKey]
+					} else {
+						// referred object key is not existent
+						invalidPipelineResults = append(invalidPipelineResults, pipelineResult.Name)
+						validPipelineResult = false
+					}
 				}
 			default:
+				invalidPipelineResults = append(invalidPipelineResults, pipelineResult.Name)
 				validPipelineResult = false
 			}
 		}
@@ -332,7 +348,11 @@ func ApplyTaskResultsToPipelineResults(
 		}
 	}
 
-	return runResults
+	if len(invalidPipelineResults) > 0 {
+		return runResults, fmt.Errorf("invalid pipelineresults %v, the referred results don't exist", invalidPipelineResults)
+	}
+
+	return runResults, nil
 }
 
 // taskResultValue returns the result value for a given pipeline task name and result name in a map of TaskRunResults for

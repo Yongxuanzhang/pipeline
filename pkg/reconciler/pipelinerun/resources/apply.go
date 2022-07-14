@@ -299,7 +299,8 @@ func ApplyTaskResultsToPipelineResults(
 					case v1beta1.ParamTypeString:
 						stringReplacements[variable] = resultValue.StringVal
 					case v1beta1.ParamTypeArray:
-						if stringIdx != "*" {
+						// array results can be referred with/without star notation
+						if stringIdx != "*" && stringIdx != "" {
 							intIdx, _ := strconv.Atoi(stringIdx)
 							if intIdx < len(resultValue.ArrayVal) {
 								stringReplacements[variable] = resultValue.ArrayVal[intIdx]

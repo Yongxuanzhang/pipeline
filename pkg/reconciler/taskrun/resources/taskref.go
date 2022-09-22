@@ -26,6 +26,7 @@ import (
 	"github.com/tektoncd/pipeline/pkg/apis/config"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	clientset "github.com/tektoncd/pipeline/pkg/client/clientset/versioned"
+	"github.com/tektoncd/pipeline/pkg/reconciler/trustedresources"
 	"github.com/tektoncd/pipeline/pkg/remote"
 	"github.com/tektoncd/pipeline/pkg/remote/oci"
 	"github.com/tektoncd/pipeline/pkg/remote/resolution"
@@ -34,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	"knative.dev/pkg/kmeta"
+	"knative.dev/pkg/logging"
 )
 
 // This error is defined in etcd at
@@ -151,6 +153,10 @@ func resolveTask(ctx context.Context, resolver remote.Resolver, name string, kin
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert obj %s into Task", obj.GetObjectKind().GroupVersionKind().String())
 	}
+	if err := verifyResolvedTask(ctx, taskObj); err != nil {
+		return nil, fmt.Errorf("verification failed: %v", err)
+	}
+	taskObj.SetDefaults(ctx)
 	return taskObj, nil
 }
 
@@ -161,10 +167,8 @@ func resolveTask(ctx context.Context, resolver remote.Resolver, name string, kin
 // older TaskObject into its v1beta1 equivalent.
 func readRuntimeObjectAsTask(ctx context.Context, obj runtime.Object) (v1beta1.TaskObject, error) {
 	if task, ok := obj.(v1beta1.TaskObject); ok {
-		task.SetDefaults(ctx)
 		return task, nil
 	}
-
 	return nil, errors.New("resource is not a task")
 }
 
@@ -190,10 +194,33 @@ func (l *LocalTaskRefResolver) GetTask(ctx context.Context, name string) (v1beta
 	if l.Namespace == "" {
 		return nil, fmt.Errorf("must specify namespace to resolve reference to task %s", name)
 	}
-	return l.Tektonclient.TektonV1beta1().Tasks(l.Namespace).Get(ctx, name, metav1.GetOptions{})
+	task, err := l.Tektonclient.TektonV1beta1().Tasks(l.Namespace).Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+	if err := verifyResolvedTask(ctx, task.DeepCopy()); err != nil {
+		return nil, fmt.Errorf("verification failed: %v", err)
+	}
+	return task, nil
 }
 
 // IsGetTaskErrTransient returns true if an error returned by GetTask is retryable.
 func IsGetTaskErrTransient(err error) bool {
 	return strings.Contains(err.Error(), errEtcdLeaderChange)
+}
+
+// verifyResolvedTask verifies the resolved task
+func verifyResolvedTask(ctx context.Context, task v1beta1.TaskObject) error {
+	cfg := config.FromContextOrDefaults(ctx)
+	if cfg.FeatureFlags.VerificationPolicy != config.SkipVerificationPolicy && cfg.FeatureFlags.EnableAPIFields == config.AlphaAPIFields {
+		if err := trustedresources.VerifyTask(ctx, task.Copy()); err != nil {
+			if cfg.FeatureFlags.VerificationPolicy == config.EnforceVerificationPolicy {
+				return err
+			}
+			logger := logging.FromContext(ctx)
+			logger.Warnf("trusted resources verification failed: %v", err)
+			return nil
+		}
+	}
+	return nil
 }

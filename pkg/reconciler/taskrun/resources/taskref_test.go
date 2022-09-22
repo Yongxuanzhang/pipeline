@@ -18,6 +18,8 @@ package resources_test
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"net/http/httptest"
 	"net/url"
 	"strings"
@@ -29,6 +31,7 @@ import (
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	"github.com/tektoncd/pipeline/pkg/client/clientset/versioned/fake"
 	"github.com/tektoncd/pipeline/pkg/reconciler/taskrun/resources"
+	"github.com/tektoncd/pipeline/pkg/reconciler/trustedresources"
 	"github.com/tektoncd/pipeline/test"
 	"github.com/tektoncd/pipeline/test/diff"
 	"github.com/tektoncd/pipeline/test/parse"
@@ -664,6 +667,149 @@ func TestGetPipelineFunc_RemoteResolutionInvalidData(t *testing.T) {
 	}
 	if _, err := fn(ctx, taskRef.Name); err == nil {
 		t.Fatalf("expected error due to invalid pipeline data but saw none")
+	}
+}
+
+func TestLocalTaskRef_TrustedResourceVerification(t *testing.T) {
+	testcases := []struct {
+		name        string
+		ref         *v1beta1.TaskRef
+		expected    runtime.Object
+		expectedErr error
+	}{
+		{
+			name: "local-unsigned-task",
+			ref: &v1beta1.TaskRef{
+				Name: "test-task",
+			},
+			expected:    nil,
+			expectedErr: fmt.Errorf("verification failed: signature is missing"),
+		}, {
+			name: "local-signed-task",
+			ref: &v1beta1.TaskRef{
+				Name: "signed",
+			},
+			expected: trustedresources.GetUnsignedTask("signed"),
+			expectedErr: nil,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+			signer, secretpath, err := trustedresources.GetSignerFromFile(t, ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			ctx = trustedresources.SetupConfigMapinContext(ctx, secretpath)
+
+			unsignedTask := trustedresources.GetUnsignedTask("test-task")
+			signedTask, err := trustedresources.GetSignedTask(unsignedTask, signer)
+			if err != nil {
+				t.Fatal("fail to sign task", err)
+			}
+
+			tektonclient := fake.NewSimpleClientset(signedTask, unsignedTask)
+
+			lc := &resources.LocalTaskRefResolver{
+				Namespace:    "trusted-resources",
+				Kind:         tc.ref.Kind,
+				Tektonclient: tektonclient,
+			}
+
+			task, err := lc.GetTask(ctx, tc.ref.Name)
+			if tc.expectedErr != nil && err.Error() != tc.expectedErr.Error() {
+				t.Fatalf("Expected error %v but found %v instead", tc.expectedErr, err)
+			} else if tc.expectedErr == nil && err != nil {
+				t.Fatalf("Received unexpected error ( %#v )", err)
+			}
+			if task != nil && task.TaskMetadata().Annotations != nil {
+				delete(task.TaskMetadata().Annotations, "tekton.dev/signature")
+			}
+			if d := cmp.Diff(task, tc.expected); tc.expected != nil && d != "" {
+				t.Error(diff.PrintWantGot(d))
+			}
+		})
+	}
+}
+
+func TestGetTaskFunc_RemoteResolution_TrustedResourceVerification(t *testing.T) {
+	ctx := context.Background()
+	signer, secretpath, err := trustedresources.GetSignerFromFile(t, ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx = trustedresources.SetupConfigMapinContext(ctx, secretpath)
+
+	unsignedTask := trustedresources.GetUnsignedTask("test-task")
+	unsignedTaskBytes, err := json.Marshal(unsignedTask)
+	if err != nil {
+		t.Fatal("fail to marshal task", err)
+	}
+
+	resolvedUnsigned := test.NewResolvedResource(unsignedTaskBytes, nil, nil)
+	requesterUnsigned := test.NewRequester(resolvedUnsigned, nil)
+
+	signedTask, err := trustedresources.GetSignedTask(unsignedTask, signer)
+	if err != nil {
+		t.Fatal("fail to sign task", err)
+	}
+	signedTaskBytes, err := json.Marshal(signedTask)
+	if err != nil {
+		t.Fatal("fail to marshal task", err)
+	}
+
+	resolvedSigned := test.NewResolvedResource(signedTaskBytes, nil, nil)
+	requesterSigned := test.NewRequester(resolvedSigned, nil)
+
+	taskRef := &v1beta1.TaskRef{ResolverRef: v1beta1.ResolverRef{Resolver: "git"}}
+
+	testcases := []struct {
+		name        string
+		requester   *test.Requester
+		expected    runtime.Object
+		expectedErr error
+	}{
+		{
+			name:        "unsigned-task",
+			requester:   requesterUnsigned,
+			expected:    nil,
+			expectedErr: fmt.Errorf("verification failed: signature is missing"),
+		}, {
+			name:        "signed-task",
+			requester:   requesterSigned,
+			expected:    signedTask,
+			expectedErr: nil,
+		},
+	}
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			tr := &v1beta1.TaskRun{
+				ObjectMeta: metav1.ObjectMeta{Namespace: "trusted-resources"},
+				Spec: v1beta1.TaskRunSpec{
+					TaskRef:            taskRef,
+					ServiceAccountName: "default",
+				},
+			}
+			fn, err := resources.GetTaskFunc(ctx, nil, nil, tc.requester, tr, tr.Spec.TaskRef, "", "default", "default")
+			if err != nil {
+				t.Fatalf("failed to get task fn: %s", err.Error())
+			}
+
+			resolvedTask, err := fn(ctx, taskRef.Name)
+
+			if tc.expectedErr != nil && err.Error() != tc.expectedErr.Error() {
+				t.Fatalf("Expected error %v but found %v instead", tc.expectedErr, err)
+			} else if tc.expectedErr == nil && err != nil {
+				t.Fatalf("Received unexpected error ( %#v )", err)
+			}
+
+			if d := cmp.Diff(tc.expected, resolvedTask); d != "" {
+				t.Error(d)
+			}
+		})
 	}
 }
 

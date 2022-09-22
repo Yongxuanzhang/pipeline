@@ -26,6 +26,7 @@ import (
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	clientset "github.com/tektoncd/pipeline/pkg/client/clientset/versioned"
 	rprp "github.com/tektoncd/pipeline/pkg/reconciler/pipelinerun/pipelinespec"
+	"github.com/tektoncd/pipeline/pkg/reconciler/trustedresources"
 	"github.com/tektoncd/pipeline/pkg/remote"
 	"github.com/tektoncd/pipeline/pkg/remote/oci"
 	"github.com/tektoncd/pipeline/pkg/remote/resolution"
@@ -33,6 +34,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
+	"knative.dev/pkg/logging"
 )
 
 // GetPipelineFunc is a factory function that will use the given PipelineRef to return a valid GetPipeline function that
@@ -107,7 +109,15 @@ func (l *LocalPipelineRefResolver) GetPipeline(ctx context.Context, name string)
 	if l.Namespace == "" {
 		return nil, fmt.Errorf("Must specify namespace to resolve reference to pipeline %s", name)
 	}
-	return l.Tektonclient.TektonV1beta1().Pipelines(l.Namespace).Get(ctx, name, metav1.GetOptions{})
+
+	pipeline, err := l.Tektonclient.TektonV1beta1().Pipelines(l.Namespace).Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+	if err := verifyResolvedPipeline(ctx, pipeline.DeepCopy()); err != nil {
+		return nil, fmt.Errorf("verification failed: %v", err)
+	}
+	return pipeline, nil
 }
 
 // resolvePipeline accepts an impl of remote.Resolver and attempts to
@@ -123,6 +133,10 @@ func resolvePipeline(ctx context.Context, resolver remote.Resolver, name string)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert obj %s into Pipeline", obj.GetObjectKind().GroupVersionKind().String())
 	}
+	if err := verifyResolvedPipeline(ctx, pipelineObj); err != nil {
+		return nil, fmt.Errorf("verification failed: %v", err)
+	}
+	pipelineObj.SetDefaults(ctx)
 	return pipelineObj, nil
 }
 
@@ -133,9 +147,24 @@ func resolvePipeline(ctx context.Context, resolver remote.Resolver, name string)
 // older PipelineObject into its v1beta1 equivalent.
 func readRuntimeObjectAsPipeline(ctx context.Context, obj runtime.Object) (v1beta1.PipelineObject, error) {
 	if pipeline, ok := obj.(v1beta1.PipelineObject); ok {
-		pipeline.SetDefaults(ctx)
 		return pipeline, nil
 	}
 
 	return nil, errors.New("resource is not a pipeline")
+}
+
+// verifyResolvedPipeline verifies the resolved pipeline
+func verifyResolvedPipeline(ctx context.Context, pipeline v1beta1.PipelineObject) error {
+	cfg := config.FromContextOrDefaults(ctx)
+	if cfg.FeatureFlags.VerificationPolicy != config.SkipVerificationPolicy && cfg.FeatureFlags.EnableAPIFields == config.AlphaAPIFields {
+		if err := trustedresources.VerifyPipeline(ctx, pipeline.Copy()); err != nil {
+			if cfg.FeatureFlags.VerificationPolicy == config.EnforceVerificationPolicy {
+				return err
+			}
+			logger := logging.FromContext(ctx)
+			logger.Warnf("trusted resources verification failed: %v", err)
+			return nil
+		}
+	}
+	return nil
 }

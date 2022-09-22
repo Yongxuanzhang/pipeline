@@ -45,6 +45,7 @@ func TestNewFeatureFlagsFromConfigMap(t *testing.T) {
 				EnableAPIFields:        config.DefaultEnableAPIFields,
 				SendCloudEventsForRuns: config.DefaultSendCloudEventsForRuns,
 				EmbeddedStatus:         config.DefaultEmbeddedStatus,
+				VerificationPolicy:     config.DefaultVerificationPolicy,
 			},
 			fileName: config.GetFeatureFlagsConfigName(),
 		},
@@ -59,6 +60,7 @@ func TestNewFeatureFlagsFromConfigMap(t *testing.T) {
 				EnableAPIFields:                  "alpha",
 				SendCloudEventsForRuns:           true,
 				EmbeddedStatus:                   "both",
+				VerificationPolicy:               "enforce",
 			},
 			fileName: "feature-flags-all-flags-set",
 		},
@@ -77,6 +79,7 @@ func TestNewFeatureFlagsFromConfigMap(t *testing.T) {
 				RequireGitSSHSecretKnownHosts:    config.DefaultRequireGitSSHSecretKnownHosts,
 				SendCloudEventsForRuns:           config.DefaultSendCloudEventsForRuns,
 				EmbeddedStatus:                   config.DefaultEmbeddedStatus,
+				VerificationPolicy:               config.DefaultVerificationPolicy,
 			},
 			fileName: "feature-flags-enable-api-fields-overrides-bundles-and-custom-tasks",
 		},
@@ -93,6 +96,7 @@ func TestNewFeatureFlagsFromConfigMap(t *testing.T) {
 				RequireGitSSHSecretKnownHosts:    config.DefaultRequireGitSSHSecretKnownHosts,
 				SendCloudEventsForRuns:           config.DefaultSendCloudEventsForRuns,
 				EmbeddedStatus:                   config.DefaultEmbeddedStatus,
+				VerificationPolicy:               config.DefaultVerificationPolicy,
 			},
 			fileName: "feature-flags-bundles-and-custom-tasks",
 		},
@@ -120,6 +124,7 @@ func TestNewFeatureFlagsFromEmptyConfigMap(t *testing.T) {
 		EnableAPIFields:                  config.DefaultEnableAPIFields,
 		SendCloudEventsForRuns:           config.DefaultSendCloudEventsForRuns,
 		EmbeddedStatus:                   config.DefaultEmbeddedStatus,
+		VerificationPolicy:               config.DefaultVerificationPolicy,
 	}
 	verifyConfigFileWithExpectedFeatureFlagsConfig(t, FeatureFlagsConfigEmptyName, expectedConfig)
 }

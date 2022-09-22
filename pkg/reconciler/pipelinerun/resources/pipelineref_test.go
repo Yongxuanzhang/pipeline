@@ -18,6 +18,8 @@ package resources_test
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"net/http/httptest"
 	"net/url"
 	"strings"
@@ -29,6 +31,7 @@ import (
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	"github.com/tektoncd/pipeline/pkg/client/clientset/versioned/fake"
 	"github.com/tektoncd/pipeline/pkg/reconciler/pipelinerun/resources"
+	"github.com/tektoncd/pipeline/pkg/reconciler/trustedresources"
 	"github.com/tektoncd/pipeline/test"
 	"github.com/tektoncd/pipeline/test/diff"
 	"github.com/tektoncd/pipeline/test/parse"
@@ -415,6 +418,149 @@ func TestGetPipelineFunc_RemoteResolutionInvalidData(t *testing.T) {
 	}
 	if _, err := fn(ctx, pipelineRef.Name); err == nil {
 		t.Fatalf("expected error due to invalid pipeline data but saw none")
+	}
+}
+
+func TestLocalPipelineRef_TrustedResourceVerification(t *testing.T) {
+	testcases := []struct {
+		name        string
+		ref         *v1beta1.PipelineRef
+		expected    runtime.Object
+		expectedErr error
+	}{
+		{
+			name: "local-unsigned-pipeline",
+			ref: &v1beta1.PipelineRef{
+				Name: "test-pipeline",
+			},
+			expected:    nil,
+			expectedErr: fmt.Errorf("verification failed: signature is missing"),
+		},
+		{
+			name: "local-signed-pipeline",
+			ref: &v1beta1.PipelineRef{
+				Name: "signed",
+			},
+			expected:    trustedresources.GetUnsignedPipeline("signed"),
+			expectedErr: nil,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+			signer, secretpath, err := trustedresources.GetSignerFromFile(t, ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			ctx = trustedresources.SetupConfigMapinContext(ctx, secretpath)
+
+			unsignedPipeline := trustedresources.GetUnsignedPipeline("test-pipeline")
+			signedPipeline, err := trustedresources.GetSignedPipeline(unsignedPipeline, signer)
+			if err != nil {
+				t.Fatal("fail to sign pipeline", err)
+			}
+
+			tektonclient := fake.NewSimpleClientset(signedPipeline, unsignedPipeline)
+
+			lc := &resources.LocalPipelineRefResolver{
+				Namespace:    "trusted-resources",
+				Tektonclient: tektonclient,
+			}
+
+			pipeline, err := lc.GetPipeline(ctx, tc.ref.Name)
+			if tc.expectedErr != nil && err.Error() != tc.expectedErr.Error() {
+				t.Fatalf("Expected error %v but found %v instead", tc.expectedErr, err)
+			} else if tc.expectedErr == nil && err != nil {
+				t.Fatalf("Received unexpected error ( %#v )", err)
+			}
+			if pipeline != nil && pipeline.PipelineMetadata().Annotations != nil {
+				delete(pipeline.PipelineMetadata().Annotations, "tekton.dev/signature")
+			}
+			if d := cmp.Diff(pipeline, tc.expected); tc.expected != nil && d != "" {
+				t.Error(diff.PrintWantGot(d))
+			}
+		})
+	}
+}
+
+func TestGetPipelineFunc_RemoteResolution_TrustedResourceVerification(t *testing.T) {
+	ctx := context.Background()
+	signer, secretpath, err := trustedresources.GetSignerFromFile(t, ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx = trustedresources.SetupConfigMapinContext(ctx, secretpath)
+
+	unsignedPipeline := trustedresources.GetUnsignedPipeline("test-pipeline")
+	unsignedPipelineBytes, err := json.Marshal(unsignedPipeline)
+	if err != nil {
+		t.Fatal("fail to marshal pipeline", err)
+	}
+
+	resolvedUnsigned := test.NewResolvedResource(unsignedPipelineBytes, nil, nil)
+	requesterUnsigned := test.NewRequester(resolvedUnsigned, nil)
+
+	signedPipeline, err := trustedresources.GetSignedPipeline(unsignedPipeline, signer)
+	if err != nil {
+		t.Fatal("fail to sign pipeline", err)
+	}
+	signedPipelineBytes, err := json.Marshal(signedPipeline)
+	if err != nil {
+		t.Fatal("fail to marshal pipeline", err)
+	}
+
+	resolvedSigned := test.NewResolvedResource(signedPipelineBytes, nil, nil)
+	requesterSigned := test.NewRequester(resolvedSigned, nil)
+
+	pipelineRef := &v1beta1.PipelineRef{ResolverRef: v1beta1.ResolverRef{Resolver: "git"}}
+
+	testcases := []struct {
+		name        string
+		requester   *test.Requester
+		expected    runtime.Object
+		expectedErr error
+	}{
+		{
+			name:        "unsigned-pipeline",
+			requester:   requesterUnsigned,
+			expected:    nil,
+			expectedErr: fmt.Errorf("verification failed: signature is missing"),
+		}, {
+			name:        "signed-pipeline",
+			requester:   requesterSigned,
+			expected:    signedPipeline,
+			expectedErr: nil,
+		},
+	}
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			pr := &v1beta1.PipelineRun{
+				ObjectMeta: metav1.ObjectMeta{Namespace: "trusted-resources"},
+				Spec: v1beta1.PipelineRunSpec{
+					PipelineRef:        pipelineRef,
+					ServiceAccountName: "default",
+				},
+			}
+			fn, err := resources.GetPipelineFunc(ctx, nil, nil, tc.requester, pr)
+			if err != nil {
+				t.Fatalf("failed to get pipeline fn: %s", err.Error())
+			}
+
+			resolvedPipeline, err := fn(ctx, pipelineRef.Name)
+
+			if tc.expectedErr != nil && err.Error() != tc.expectedErr.Error() {
+				t.Fatalf("Expected error %v but found %v instead", tc.expectedErr, err)
+			} else if tc.expectedErr == nil && err != nil {
+				t.Fatalf("Received unexpected error ( %#v )", err)
+			}
+
+			if d := cmp.Diff(tc.expected, resolvedPipeline); d != "" {
+				t.Error(d)
+			}
+		})
 	}
 }
 

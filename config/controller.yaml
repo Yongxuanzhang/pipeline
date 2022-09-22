@@ -90,6 +90,9 @@ spec:
           mountPath: /etc/config-logging
         - name: config-registry-cert
           mountPath: /etc/config-registry-cert
+        - name: signing-secrets
+          mountPath: /etc/signing-secrets
+          readOnly: true
         env:
         - name: SYSTEM_NAMESPACE
           valueFrom:
@@ -156,6 +159,10 @@ spec:
         - name: config-registry-cert
           configMap:
             name: config-registry-cert
+        # Uncomment this to mount secret for trusted resources
+        #- name: signing-secrets
+        #  secret:
+        #    secretName: signing-secrets
 ---
 apiVersion: v1
 kind: Service

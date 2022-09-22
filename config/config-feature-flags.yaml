@@ -81,3 +81,7 @@ data:
   # Setting this flag to "true" enables CloudEvents for Runs, as long as a
   # CloudEvents sink is configured in the config-defaults config map
   send-cloudevents-for-runs: "false"
+  # Setting this flag to "enforce" will enforce verification of tasks/pipeline, fail to verify
+  # will mark the taskrun/pipelinerun as failed. "warn" will only log the err message and "skip"
+  # will skip the whole verification
+  verification-policy: "skip"

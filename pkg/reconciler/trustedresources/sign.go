@@ -25,8 +25,8 @@ import (
 	"github.com/sigstore/sigstore/pkg/signature"
 )
 
-// signInterface returns the encoded signature for the given object.
-func signInterface(signer signature.Signer, i interface{}) ([]byte, error) {
+// SignInterface returns the encoded signature for the given object.
+func SignInterface(signer signature.Signer, i interface{}) ([]byte, error) {
 	if signer == nil {
 		return nil, fmt.Errorf("signer is nil")
 	}

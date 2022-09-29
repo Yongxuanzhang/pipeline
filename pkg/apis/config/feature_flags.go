@@ -42,6 +42,14 @@ const (
 	// MinimalEmbeddedStatus is the value used for "embedded-status" when only ChildReferences should be used in
 	// PipelineRunStatusFields.
 	MinimalEmbeddedStatus = "minimal"
+	// EnforceResourceVerificationMode is the value used for "resource-verification-mode" when verification is applied and fail the
+	// TaskRun or PipelineRun when verification fails
+	EnforceResourceVerificationMode = "enforce"
+	// WarnResourceVerificationMode is the value used for "resource-verification-mode" when verification is applied but only log
+	// the warning when verification fails
+	WarnResourceVerificationMode = "warn"
+	// SkipResourceVerificationMode is the value used for "resource-verification-mode" when verification is skipped
+	SkipResourceVerificationMode = "skip"
 	// DefaultDisableAffinityAssistant is the default value for "disable-affinity-assistant".
 	DefaultDisableAffinityAssistant = false
 	// DefaultDisableCredsInit is the default value for "disable-creds-init".
@@ -62,6 +70,8 @@ const (
 	DefaultSendCloudEventsForRuns = false
 	// DefaultEmbeddedStatus is the default value for "embedded-status".
 	DefaultEmbeddedStatus = FullEmbeddedStatus
+	// DefaultVerificationPolicy is the default value for "resource-verification-mode".
+	DefaultVerificationPolicy = SkipResourceVerificationMode
 
 	disableAffinityAssistantKey         = "disable-affinity-assistant"
 	disableCredsInitKey                 = "disable-creds-init"
@@ -73,6 +83,7 @@ const (
 	enableAPIFields                     = "enable-api-fields"
 	sendCloudEventsForRuns              = "send-cloudevents-for-runs"
 	embeddedStatus                      = "embedded-status"
+	verificationMode                  = "resource-verification-mode"
 )
 
 // FeatureFlags holds the features configurations
@@ -89,6 +100,7 @@ type FeatureFlags struct {
 	SendCloudEventsForRuns           bool
 	AwaitSidecarReadiness            bool
 	EmbeddedStatus                   string
+	VerificationPolicy               string
 }
 
 // GetFeatureFlagsConfigName returns the name of the configmap containing all
@@ -140,6 +152,9 @@ func NewFeatureFlagsFromMap(cfgMap map[string]string) (*FeatureFlags, error) {
 	if err := setEmbeddedStatus(cfgMap, DefaultEmbeddedStatus, &tc.EmbeddedStatus); err != nil {
 		return nil, err
 	}
+	if err := setVerificationPolicy(cfgMap, DefaultVerificationPolicy, &tc.VerificationPolicy); err != nil {
+		return nil, err
+	}
 
 	// Given that they are alpha features, Tekton Bundles and Custom Tasks should be switched on if
 	// enable-api-fields is "alpha". If enable-api-fields is not "alpha" then fall back to the value of
@@ -189,6 +204,22 @@ func setEmbeddedStatus(cfgMap map[string]string, defaultValue string, feature *s
 		*feature = value
 	default:
 		return fmt.Errorf("invalid value for feature flag %q: %q", embeddedStatus, value)
+	}
+	return nil
+}
+
+// setVerificationPolicy sets the "resource-verification-mode" flag based on the content of a given map.
+// If the value is invalid or missing then an error is returned.
+func setVerificationPolicy(cfgMap map[string]string, defaultValue string, feature *string) error {
+	value := defaultValue
+	if cfg, ok := cfgMap[verificationMode]; ok {
+		value = strings.ToLower(cfg)
+	}
+	switch value {
+	case EnforceResourceVerificationMode, WarnResourceVerificationMode, SkipResourceVerificationMode:
+		*feature = value
+	default:
+		return fmt.Errorf("invalid value for feature flag %q: %q", verificationMode, value)
 	}
 	return nil
 }

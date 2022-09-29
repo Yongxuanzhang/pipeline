@@ -18,6 +18,9 @@ package resources_test
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
+	"fmt"
 	"net/http/httptest"
 	"net/url"
 	"strings"
@@ -25,10 +28,13 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-containerregistry/pkg/registry"
+	"github.com/sigstore/sigstore/pkg/signature"
 	"github.com/tektoncd/pipeline/pkg/apis/config"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	"github.com/tektoncd/pipeline/pkg/client/clientset/versioned/fake"
 	"github.com/tektoncd/pipeline/pkg/reconciler/taskrun/resources"
+	ttesting "github.com/tektoncd/pipeline/pkg/reconciler/testing"
+	"github.com/tektoncd/pipeline/pkg/reconciler/trustedresources"
 	"github.com/tektoncd/pipeline/test"
 	"github.com/tektoncd/pipeline/test/diff"
 	"github.com/tektoncd/pipeline/test/parse"
@@ -665,6 +671,286 @@ func TestGetPipelineFunc_RemoteResolutionInvalidData(t *testing.T) {
 	if _, err := fn(ctx, taskRef.Name); err == nil {
 		t.Fatalf("expected error due to invalid pipeline data but saw none")
 	}
+}
+
+func TestLocalTaskRef_TrustedResourceVerification(t *testing.T) {
+	ctx := context.Background()
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	signer, secretpath, err := ttesting.GetSignerFromFile(ctx, t)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	unsignedTask := ttesting.GetUnsignedTask("test-task")
+	signedTask, err := getSignedTask(unsignedTask, signer, "test-signed")
+	if err != nil {
+		t.Fatal("fail to sign task", err)
+	}
+	// attack another signed task
+	signedTask2, err := getSignedTask(ttesting.GetUnsignedTask("test-task2"), signer, "test-signed2")
+	if err != nil {
+		t.Fatal("fail to sign task", err)
+	}
+	tamperedTask := getTamperedTask(signedTask2)
+
+	tektonclient := fake.NewSimpleClientset(signedTask, unsignedTask, tamperedTask)
+	testcases := []struct {
+		name               string
+		ref                *v1beta1.TaskRef
+		verificationPolicy string
+		expected           runtime.Object
+		expectedErr        error
+	}{
+		{
+			name: "local unsigned task with enforce policy",
+			ref: &v1beta1.TaskRef{
+				Name: "test-task",
+			},
+			verificationPolicy: config.EnforceResourceVerificationMode,
+			expected:           nil,
+			expectedErr:        fmt.Errorf("verification failed: signature is missing"),
+		}, {
+			name: "local signed task with enforce policy",
+			ref: &v1beta1.TaskRef{
+				Name: "test-signed",
+			},
+			verificationPolicy: config.EnforceResourceVerificationMode,
+			expected:           signedTask,
+			expectedErr:        nil,
+		}, {
+			name: "local tampered task with enforce policy",
+			ref: &v1beta1.TaskRef{
+				Name: "test-signed2",
+			},
+			verificationPolicy: config.EnforceResourceVerificationMode,
+			expected:           nil,
+			expectedErr:        fmt.Errorf("verification failed: Task test-signed2 in namespace trusted-resources fails verification"),
+		}, {
+			name: "local unsigned task with warn policy",
+			ref: &v1beta1.TaskRef{
+				Name: "test-task",
+			},
+			verificationPolicy: config.WarnResourceVerificationMode,
+			expected:           unsignedTask,
+			expectedErr:        nil,
+		}, {
+			name: "local signed task with warn policy",
+			ref: &v1beta1.TaskRef{
+				Name: "test-signed",
+			},
+			verificationPolicy: config.WarnResourceVerificationMode,
+			expected:           signedTask,
+			expectedErr:        nil,
+		}, {
+			name: "local tampered task with warn policy",
+			ref: &v1beta1.TaskRef{
+				Name: "test-signed2",
+			},
+			verificationPolicy: config.SkipResourceVerificationMode,
+			expected:           tamperedTask,
+			expectedErr:        nil,
+		}, {
+			name: "local unsigned task with skip policy",
+			ref: &v1beta1.TaskRef{
+				Name: "test-task",
+			},
+			verificationPolicy: config.SkipResourceVerificationMode,
+			expected:           unsignedTask,
+			expectedErr:        nil,
+		}, {
+			name: "local signed task with skip policy",
+			ref: &v1beta1.TaskRef{
+				Name: "test-signed",
+			},
+			verificationPolicy: config.SkipResourceVerificationMode,
+			expected:           signedTask,
+			expectedErr:        nil,
+		}, {
+			name: "local tampered task with skip policy",
+			ref: &v1beta1.TaskRef{
+				Name: "test-signed2",
+			},
+			verificationPolicy: config.WarnResourceVerificationMode,
+			expected:           tamperedTask,
+			expectedErr:        nil,
+		},
+	}
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx = ttesting.SetupConfigMapinContext(ctx, secretpath, tc.verificationPolicy)
+			lc := &resources.LocalTaskRefResolver{
+				Namespace:    "trusted-resources",
+				Kind:         tc.ref.Kind,
+				Tektonclient: tektonclient,
+			}
+
+			task, err := lc.GetTask(ctx, tc.ref.Name)
+			if tc.expectedErr != nil && (err == nil || err.Error() != tc.expectedErr.Error()) {
+				t.Fatalf("Expected error %v but found %v instead", tc.expectedErr, err)
+			} else if tc.expectedErr == nil && err != nil {
+				t.Fatalf("Received unexpected error ( %#v )", err)
+			}
+			if d := cmp.Diff(task, tc.expected); d != "" {
+				t.Error(diff.PrintWantGot(d))
+			}
+		})
+	}
+}
+
+func TestGetTaskFunc_RemoteResolution_TrustedResourceVerification(t *testing.T) {
+	ctx := context.Background()
+	signer, secretpath, err := ttesting.GetSignerFromFile(ctx, t)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	unsignedTask := ttesting.GetUnsignedTask("test-task")
+	unsignedTaskBytes, err := json.Marshal(unsignedTask)
+	if err != nil {
+		t.Fatal("fail to marshal task", err)
+	}
+
+	resolvedUnsigned := test.NewResolvedResource(unsignedTaskBytes, nil, nil)
+	requesterUnsigned := test.NewRequester(resolvedUnsigned, nil)
+
+	signedTask, err := getSignedTask(unsignedTask, signer, "signed")
+	if err != nil {
+		t.Fatal("fail to sign task", err)
+	}
+	signedTaskBytes, err := json.Marshal(signedTask)
+	if err != nil {
+		t.Fatal("fail to marshal task", err)
+	}
+
+	resolvedSigned := test.NewResolvedResource(signedTaskBytes, nil, nil)
+	requesterSigned := test.NewRequester(resolvedSigned, nil)
+
+	tamperedTask := signedTask.DeepCopy()
+	tamperedTask.Annotations["random"] = "attack"
+	tamperedTaskBytes, err := json.Marshal(tamperedTask)
+	if err != nil {
+		t.Fatal("fail to marshal task", err)
+	}
+	resolvedTampered := test.NewResolvedResource(tamperedTaskBytes, nil, nil)
+	requesterTampered := test.NewRequester(resolvedTampered, nil)
+
+	taskRef := &v1beta1.TaskRef{ResolverRef: v1beta1.ResolverRef{Resolver: "git"}}
+
+	testcases := []struct {
+		name               string
+		requester          *test.Requester
+		verificationPolicy string
+		expected           runtime.Object
+		expectedErr        error
+	}{
+		{
+			name:               "unsigned task with enforce policy",
+			requester:          requesterUnsigned,
+			verificationPolicy: config.EnforceResourceVerificationMode,
+			expected:           nil,
+			expectedErr:        fmt.Errorf("verification failed: signature is missing"),
+		}, {
+			name:               "signed task with enforce policy",
+			requester:          requesterSigned,
+			verificationPolicy: config.EnforceResourceVerificationMode,
+			expected:           signedTask,
+			expectedErr:        nil,
+		}, {
+			name:               "tampered task with enforce policy",
+			requester:          requesterTampered,
+			verificationPolicy: config.EnforceResourceVerificationMode,
+			expected:           nil,
+			expectedErr:        fmt.Errorf("verification failed: Task signed in namespace trusted-resources fails verification"),
+		}, {
+			name:               "unsigned task with warn policy",
+			requester:          requesterUnsigned,
+			verificationPolicy: config.WarnResourceVerificationMode,
+			expected:           unsignedTask,
+			expectedErr:        nil,
+		}, {
+			name:               "signed task with warn policy",
+			requester:          requesterSigned,
+			verificationPolicy: config.WarnResourceVerificationMode,
+			expected:           signedTask,
+			expectedErr:        nil,
+		}, {
+			name:               "tampered task with warn policy",
+			requester:          requesterTampered,
+			verificationPolicy: config.SkipResourceVerificationMode,
+			expected:           tamperedTask,
+			expectedErr:        nil,
+		}, {
+			name:               "unsigned task with skip policy",
+			requester:          requesterUnsigned,
+			verificationPolicy: config.SkipResourceVerificationMode,
+			expected:           unsignedTask,
+			expectedErr:        nil,
+		}, {
+			name:               "signed task with skip policy",
+			requester:          requesterSigned,
+			verificationPolicy: config.SkipResourceVerificationMode,
+			expected:           signedTask,
+			expectedErr:        nil,
+		}, {
+			name:               "tampered task with skip policy",
+			requester:          requesterTampered,
+			verificationPolicy: config.WarnResourceVerificationMode,
+			expected:           tamperedTask,
+			expectedErr:        nil,
+		},
+	}
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx = ttesting.SetupConfigMapinContext(ctx, secretpath, tc.verificationPolicy)
+			tr := &v1beta1.TaskRun{
+				ObjectMeta: metav1.ObjectMeta{Namespace: "trusted-resources"},
+				Spec: v1beta1.TaskRunSpec{
+					TaskRef:            taskRef,
+					ServiceAccountName: "default",
+				},
+			}
+			fn, err := resources.GetTaskFunc(ctx, nil, nil, tc.requester, tr, tr.Spec.TaskRef, "", "default", "default")
+			if err != nil {
+				t.Fatalf("failed to get task fn: %s", err.Error())
+			}
+
+			resolvedTask, err := fn(ctx, taskRef.Name)
+
+			if tc.expectedErr != nil && (err == nil || err.Error() != tc.expectedErr.Error()) {
+				t.Fatalf("Expected error %v but found %v instead", tc.expectedErr, err)
+			} else if tc.expectedErr == nil && err != nil {
+				t.Fatalf("Received unexpected error ( %#v )", err)
+			}
+
+			if d := cmp.Diff(tc.expected, resolvedTask); d != "" {
+				t.Error(d)
+			}
+		})
+	}
+}
+
+func getSignedTask(unsigned *v1beta1.Task, signer signature.Signer, name string) (*v1beta1.Task, error) {
+	signedTask := unsigned.DeepCopy()
+	signedTask.Name = name
+	if signedTask.Annotations == nil {
+		signedTask.Annotations = map[string]string{}
+	}
+	signature, err := trustedresources.SignInterface(signer, signedTask)
+	if err != nil {
+		return nil, err
+	}
+	signedTask.Annotations[trustedresources.SignatureAnnotation] = base64.StdEncoding.EncodeToString(signature)
+	return signedTask, nil
+}
+
+func getTamperedTask(task *v1beta1.Task) *v1beta1.Task {
+	tampered := task.DeepCopy()
+	if tampered.Annotations == nil {
+		tampered.Annotations = make(map[string]string)
+	}
+	tampered.Annotations["random"] = "attack"
+	return tampered
 }
 
 // This is missing the kind and apiVersion because those are added by

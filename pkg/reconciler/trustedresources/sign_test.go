@@ -73,7 +73,7 @@ func TestSignInterface(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
-			sig, err := signInterface(tc.signer, tc.target)
+			sig, err := SignInterface(tc.signer, tc.target)
 			if (err != nil) != tc.wantErr {
 				t.Fatalf("SignInterface() get err %v, wantErr %t", err, tc.wantErr)
 			}
@@ -89,7 +89,7 @@ func TestSignInterface(t *testing.T) {
 			if tc.wantErr {
 				return
 			}
-			if err := verifyInterface(ctx, tc.target, tc.signer, sig); err != nil {
+			if err := VerifyInterface(ctx, tc.target, tc.signer, sig); err != nil {
 				t.Fatalf("SignInterface() generate wrong signature: %v", err)
 			}
 

@@ -42,6 +42,7 @@ import (
 	"github.com/tektoncd/pipeline/pkg/reconciler/events"
 	"github.com/tektoncd/pipeline/pkg/reconciler/events/cloudevent"
 	"github.com/tektoncd/pipeline/pkg/reconciler/taskrun/resources"
+	"github.com/tektoncd/pipeline/pkg/reconciler/trustedresources"
 	"github.com/tektoncd/pipeline/pkg/reconciler/volumeclaim"
 	"github.com/tektoncd/pipeline/pkg/remote"
 	resolution "github.com/tektoncd/pipeline/pkg/resolution/resource"
@@ -332,6 +333,10 @@ func (c *Reconciler) prepare(ctx context.Context, tr *v1beta1.TaskRun) (*v1beta1
 		message := fmt.Sprintf("TaskRun %s/%s awaiting remote resource", tr.Namespace, tr.Name)
 		tr.Status.MarkResourceOngoing(v1beta1.TaskRunReasonResolvingTaskRef, message)
 		return nil, nil, err
+	case errors.Is(err, trustedresources.ErrorResourceVerificationFailed):
+		logger.Errorf("TaskRun %s/%s referred task failed signature verification", tr.Namespace, tr.Name)
+		tr.Status.MarkResourceFailed(podconvert.ReasonResourceVerificationFailed, err)
+		return nil, nil, controller.NewPermanentError(err)
 	case err != nil:
 		logger.Errorf("Failed to determine Task spec to use for taskrun %s: %v", tr.Name, err)
 		if resources.IsGetTaskErrTransient(err) {

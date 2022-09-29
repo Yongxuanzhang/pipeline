@@ -19,14 +19,16 @@ package trustedresources
 import (
 	"bytes"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 
 	"github.com/sigstore/sigstore/pkg/signature"
+	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 )
 
-// signInterface returns the encoded signature for the given object.
-func signInterface(signer signature.Signer, i interface{}) ([]byte, error) {
+// SignInterface returns the encoded signature for the given object.
+func SignInterface(signer signature.Signer, i interface{}) ([]byte, error) {
 	if signer == nil {
 		return nil, fmt.Errorf("signer is nil")
 	}
@@ -43,4 +45,34 @@ func signInterface(signer signature.Signer, i interface{}) ([]byte, error) {
 	}
 
 	return sig, nil
+}
+
+// GetSignedPipeline signed the given pipeline and rename it with given name
+func GetSignedPipeline(unsigned *v1beta1.Pipeline, signer signature.Signer, name string) (*v1beta1.Pipeline, error) {
+	signedPipeline := unsigned.DeepCopy()
+	signedPipeline.Name = name
+	if signedPipeline.Annotations == nil {
+		signedPipeline.Annotations = map[string]string{}
+	}
+	signature, err := SignInterface(signer, signedPipeline)
+	if err != nil {
+		return nil, err
+	}
+	signedPipeline.Annotations[SignatureAnnotation] = base64.StdEncoding.EncodeToString(signature)
+	return signedPipeline, nil
+}
+
+// GetSignedTask signed the given task and rename it with given name
+func GetSignedTask(unsigned *v1beta1.Task, signer signature.Signer, name string) (*v1beta1.Task, error) {
+	signedTask := unsigned.DeepCopy()
+	signedTask.Name = name
+	if signedTask.Annotations == nil {
+		signedTask.Annotations = map[string]string{}
+	}
+	signature, err := SignInterface(signer, signedTask)
+	if err != nil {
+		return nil, err
+	}
+	signedTask.Annotations[SignatureAnnotation] = base64.StdEncoding.EncodeToString(signature)
+	return signedTask, nil
 }

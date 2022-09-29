@@ -38,8 +38,10 @@ import (
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	resourcev1alpha1 "github.com/tektoncd/pipeline/pkg/apis/resource/v1alpha1"
 	"github.com/tektoncd/pipeline/pkg/reconciler/events/cloudevent"
+	internaltesting "github.com/tektoncd/pipeline/pkg/reconciler/internal/testing"
 	"github.com/tektoncd/pipeline/pkg/reconciler/pipelinerun/resources"
 	ttesting "github.com/tektoncd/pipeline/pkg/reconciler/testing"
+	"github.com/tektoncd/pipeline/pkg/reconciler/trustedresources"
 	"github.com/tektoncd/pipeline/pkg/reconciler/volumeclaim"
 	resolutioncommon "github.com/tektoncd/pipeline/pkg/resolution/common"
 	"github.com/tektoncd/pipeline/test"
@@ -10741,6 +10743,160 @@ spec:
 			if err != nil {
 				t.Fatalf("Error found: %v", err)
 			}
+		})
+	}
+}
+
+func TestReconcile_verifyResolvedPipeline(t *testing.T) {
+	names.TestingSeed()
+	ctx := context.Background()
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	prs := parse.MustParsePipelineRun(t, `
+metadata:
+  name: test-pipelinerun
+  namespace: foo
+  selfLink: /pipeline/1234
+spec:
+  pipelineRef:
+    name: test-pipeline
+`)
+	ps := parse.MustParsePipeline(t, `
+metadata:
+  name: test-pipeline
+  namespace: foo
+spec:
+  tasks:
+    - name: test-1
+      taskRef:
+        name: test-task
+`)
+	ts := parse.MustParseTask(t, `
+metadata:
+  name: test-task
+  namespace: foo
+spec:
+  steps:
+    - name: simple-step
+      image: foo
+      command: ["/mycmd"]
+      env:
+       - name: foo
+         value: bar
+`)
+
+	signer, secretpath, err := internaltesting.GetSignerFromFile(ctx, t)
+	if err != nil {
+		t.Fatal(err)
+	}
+	signedTask, err := trustedresources.GetSignedTask(ts, signer, "test-task")
+	if err != nil {
+		t.Fatal("fail to sign task", err)
+	}
+	signedPipeline, err := trustedresources.GetSignedPipeline(ps, signer, "test-pipeline")
+	if err != nil {
+		t.Fatal("fail to sign pipeline", err)
+	}
+
+	tamperedTask := signedTask.DeepCopy()
+	if tamperedTask.Annotations == nil {
+		tamperedTask.Annotations = make(map[string]string)
+	}
+	tamperedTask.Annotations["random"] = "attack"
+
+	tamperedPipeline := signedPipeline.DeepCopy()
+	if tamperedPipeline.Annotations == nil {
+		tamperedPipeline.Annotations = make(map[string]string)
+	}
+	tamperedPipeline.Annotations["random"] = "attack"
+
+	cms := []*corev1.ConfigMap{
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: config.GetFeatureFlagsConfigName(), Namespace: system.Namespace()},
+			Data: map[string]string{
+				"resource-verification-mode": "enforce",
+				"enable-api-fields":          "alpha",
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: config.GetTrustedResourcesConfigName(), Namespace: system.Namespace()},
+			Data: map[string]string{
+				config.PublicKeys: secretpath,
+			},
+		},
+	}
+	t.Logf("config maps: %s", cms)
+
+	testCases := []struct {
+		name            string
+		pipelinerun     []*v1beta1.PipelineRun
+		pipeline        []*v1beta1.Pipeline
+		task            []*v1beta1.Task
+		pernamentErr    bool
+		conditionStatus corev1.ConditionStatus
+		conditionReason string
+	}{
+		{
+			name:            "unsigned pipeline fails verification",
+			pipelinerun:     []*v1beta1.PipelineRun{prs},
+			pipeline:        []*v1beta1.Pipeline{ps},
+			pernamentErr:    true,
+			conditionStatus: corev1.ConditionFalse,
+			conditionReason: ReasonResourceVerificationFailed,
+		},
+		{
+			name:            "signed pipeline passes verification",
+			pipelinerun:     []*v1beta1.PipelineRun{prs},
+			pipeline:        []*v1beta1.Pipeline{signedPipeline},
+			task:            []*v1beta1.Task{signedTask},
+			pernamentErr:    false,
+			conditionStatus: corev1.ConditionUnknown,
+			conditionReason: v1beta1.PipelineRunReasonRunning.String(),
+		},
+		{
+			name:            "signed pipeline with unsigned task fails verification",
+			pipelinerun:     []*v1beta1.PipelineRun{prs},
+			pipeline:        []*v1beta1.Pipeline{signedPipeline},
+			task:            []*v1beta1.Task{ts},
+			pernamentErr:    true,
+			conditionStatus: corev1.ConditionFalse,
+			conditionReason: ReasonResourceVerificationFailed,
+		},
+		{
+			name:            "signed pipeline with modified task fails verification",
+			pipelinerun:     []*v1beta1.PipelineRun{prs},
+			pipeline:        []*v1beta1.Pipeline{signedPipeline},
+			task:            []*v1beta1.Task{tamperedTask},
+			pernamentErr:    true,
+			conditionStatus: corev1.ConditionFalse,
+			conditionReason: ReasonResourceVerificationFailed,
+		},
+		{
+			name:            "modified pipeline with signed task fails verification",
+			pipelinerun:     []*v1beta1.PipelineRun{prs},
+			pipeline:        []*v1beta1.Pipeline{tamperedPipeline},
+			task:            []*v1beta1.Task{signedTask},
+			pernamentErr:    true,
+			conditionStatus: corev1.ConditionFalse,
+			conditionReason: ReasonResourceVerificationFailed,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			d := test.Data{
+				PipelineRuns: tc.pipelinerun,
+				Pipelines:    tc.pipeline,
+				Tasks:        tc.task,
+				ConfigMaps:   cms,
+			}
+			prt := newPipelineRunTest(d, t)
+			defer prt.Cancel()
+
+			reconciledRun, _ := prt.reconcileRun("foo", "test-pipelinerun", []string{}, tc.pernamentErr)
+
+			checkPipelineRunConditionStatusAndReason(t, reconciledRun, tc.conditionStatus, tc.conditionReason)
 		})
 	}
 }

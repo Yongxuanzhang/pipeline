@@ -40,8 +40,10 @@ import (
 	resourcev1alpha1 "github.com/tektoncd/pipeline/pkg/apis/resource/v1alpha1"
 	podconvert "github.com/tektoncd/pipeline/pkg/pod"
 	"github.com/tektoncd/pipeline/pkg/reconciler/events/cloudevent"
+	internaltesting "github.com/tektoncd/pipeline/pkg/reconciler/internal/testing"
 	"github.com/tektoncd/pipeline/pkg/reconciler/taskrun/resources"
 	ttesting "github.com/tektoncd/pipeline/pkg/reconciler/testing"
+	"github.com/tektoncd/pipeline/pkg/reconciler/trustedresources"
 	"github.com/tektoncd/pipeline/pkg/reconciler/volumeclaim"
 	resolutioncommon "github.com/tektoncd/pipeline/pkg/resolution/common"
 	"github.com/tektoncd/pipeline/pkg/workspace"
@@ -4978,5 +4980,136 @@ status:
 
 	if d := cmp.Diff(expectedStatusSpec, updatedTR.Status.TaskSpec); d != "" {
 		t.Errorf("expected Status.TaskSpec to match, but differed: %s", diff.PrintWantGot(d))
+	}
+}
+
+func TestReconcile_verifyResolvedTask(t *testing.T) {
+	ctx := context.Background()
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	ts := parse.MustParseTask(t, `
+metadata:
+  name: test-task
+  namespace: foo
+spec:
+  params:
+  - default: mydefault
+    name: myarg
+    type: string
+  steps:
+  - script: echo $(inputs.params.myarg)
+    image: myimage
+    name: mycontainer
+`)
+	tr := parse.MustParseTaskRun(t, `
+metadata:
+  name: test-taskrun
+  namespace: foo
+spec:
+  params:
+  - name: myarg
+    value: foo
+  taskRef:
+    name: test-task
+status:
+  podName: the-pod
+`)
+
+	signer, secretpath, err := internaltesting.GetSignerFromFile(ctx, t)
+	if err != nil {
+		t.Fatal(err)
+	}
+	signedTask, err := trustedresources.GetSignedTask(ts, signer, "test-task")
+	if err != nil {
+		t.Fatal("fail to sign task", err)
+	}
+
+	tamperedTask := signedTask.DeepCopy()
+	if tamperedTask.Annotations == nil {
+		tamperedTask.Annotations = make(map[string]string)
+	}
+	tamperedTask.Annotations["random"] = "attack"
+
+	cms := []*corev1.ConfigMap{
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: config.GetFeatureFlagsConfigName(), Namespace: system.Namespace()},
+			Data: map[string]string{
+				"resource-verification-mode": "enforce",
+				"enable-api-fields":          "alpha",
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: config.GetTrustedResourcesConfigName(), Namespace: system.Namespace()},
+			Data: map[string]string{
+				config.PublicKeys: secretpath,
+			},
+		},
+	}
+
+	testCases := []struct {
+		name            string
+		taskrun         []*v1beta1.TaskRun
+		task            []*v1beta1.Task
+		expectedError   error
+		conditionStatus corev1.ConditionStatus
+		conditionReason string
+	}{
+		{
+			name:            "unsigned task fails verification",
+			task:            []*v1beta1.Task{ts},
+			expectedError:   fmt.Errorf("1 error occurred:\n\t* error when listing tasks for taskRun test-taskrun: resource verification failed"),
+			conditionStatus: corev1.ConditionFalse,
+			conditionReason: podconvert.ReasonResourceVerificationFailed,
+		},
+		{
+			name:            "signed task passes verification",
+			task:            []*v1beta1.Task{signedTask},
+			expectedError:   nil,
+			conditionStatus: corev1.ConditionUnknown,
+			conditionReason: v1beta1.PipelineRunReasonRunning.String(),
+		},
+		{
+			name:            "modified task fails verification",
+			task:            []*v1beta1.Task{tamperedTask},
+			expectedError:   fmt.Errorf("1 error occurred:\n\t* error when listing tasks for taskRun test-taskrun: resource verification failed"),
+			conditionStatus: corev1.ConditionFalse,
+			conditionReason: podconvert.ReasonResourceVerificationFailed,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			d := test.Data{
+				TaskRuns:   []*v1beta1.TaskRun{tr},
+				Tasks:      tc.task,
+				ConfigMaps: cms,
+			}
+
+			testAssets, cancel := getTaskRunController(t, d)
+			defer cancel()
+			createServiceAccount(t, testAssets, tr.Spec.ServiceAccountName, tr.Namespace)
+			err := testAssets.Controller.Reconciler.Reconcile(testAssets.Ctx, getRunName(tr))
+
+			if tc.expectedError == nil {
+				if ok, _ := controller.IsRequeueKey(err); !ok {
+					t.Errorf("Error reconciling TaskRun. Got error %v", err)
+				}
+				return
+			}
+
+			if d := cmp.Diff(strings.TrimSuffix(err.Error(), "\n\n"), tc.expectedError.Error()); d != "" {
+				t.Errorf("Expected: %v, but Got: %v", tc.expectedError.Error(), err.Error())
+			}
+			tr, err := testAssets.Clients.Pipeline.TektonV1beta1().TaskRuns(tr.Namespace).Get(testAssets.Ctx, tr.Name, metav1.GetOptions{})
+			if err != nil {
+				t.Fatalf("getting updated taskrun: %v", err)
+			}
+			condition := tr.Status.GetCondition(apis.ConditionSucceeded)
+			if condition.Type != apis.ConditionSucceeded || condition.Status != corev1.ConditionFalse || condition.Reason != tc.conditionReason {
+				t.Errorf("Expected TaskRun to fail with reason \"%s\" but it did not. Final conditions were:\n%#v", tc.conditionReason, tr.Status.Conditions)
+			}
+
+		})
 	}
 }

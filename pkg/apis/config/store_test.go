@@ -33,19 +33,22 @@ func TestStoreLoadWithContext(t *testing.T) {
 	artifactBucketConfig := test.ConfigMapFromTestFile(t, "config-artifact-bucket")
 	artifactPVCConfig := test.ConfigMapFromTestFile(t, "config-artifact-pvc")
 	metricsConfig := test.ConfigMapFromTestFile(t, "config-observability")
+	trustedresourcesConfig := test.ConfigMapFromTestFile(t, "config-trusted-resources")
 
 	expectedDefaults, _ := config.NewDefaultsFromConfigMap(defaultConfig)
 	expectedFeatures, _ := config.NewFeatureFlagsFromConfigMap(featuresConfig)
 	expectedArtifactBucket, _ := config.NewArtifactBucketFromConfigMap(artifactBucketConfig)
 	expectedArtifactPVC, _ := config.NewArtifactPVCFromConfigMap(artifactPVCConfig)
 	metrics, _ := config.NewMetricsFromConfigMap(metricsConfig)
+	expectedTrustedResources, _ := config.NewTrustedResourcesConfigFromConfigMap(trustedresourcesConfig)
 
 	expected := &config.Config{
-		Defaults:       expectedDefaults,
-		FeatureFlags:   expectedFeatures,
-		ArtifactBucket: expectedArtifactBucket,
-		ArtifactPVC:    expectedArtifactPVC,
-		Metrics:        metrics,
+		Defaults:         expectedDefaults,
+		FeatureFlags:     expectedFeatures,
+		ArtifactBucket:   expectedArtifactBucket,
+		ArtifactPVC:      expectedArtifactPVC,
+		Metrics:          metrics,
+		TrustedResources: expectedTrustedResources,
 	}
 
 	store := config.NewStore(logtesting.TestLogger(t))
@@ -54,6 +57,7 @@ func TestStoreLoadWithContext(t *testing.T) {
 	store.OnConfigChanged(artifactBucketConfig)
 	store.OnConfigChanged(artifactPVCConfig)
 	store.OnConfigChanged(metricsConfig)
+	store.OnConfigChanged(trustedresourcesConfig)
 
 	cfg := config.FromContext(store.ToContext(context.Background()))
 

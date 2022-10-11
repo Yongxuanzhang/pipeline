@@ -597,7 +597,6 @@ github.com/shurcooL/graphql/internal/jsonutil
 ## explicit; go 1.18
 github.com/sigstore/sigstore/pkg/cryptoutils
 github.com/sigstore/sigstore/pkg/signature
-github.com/sigstore/sigstore/pkg/signature/kms
 github.com/sigstore/sigstore/pkg/signature/options
 github.com/sigstore/sigstore/pkg/signature/payload
 # github.com/sirupsen/logrus v1.9.0

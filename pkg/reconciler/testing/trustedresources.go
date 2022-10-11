@@ -109,7 +109,7 @@ func SetupConfigMapinContext(ctx context.Context, keypath string, verificationPo
 			Name:      "feature-flags",
 		},
 		Data: map[string]string{
-			"enable-api-fields":   config.AlphaAPIFields,
+			"enable-api-fields":          config.AlphaAPIFields,
 			"resource-verification-mode": verificationPolicy,
 		},
 	}

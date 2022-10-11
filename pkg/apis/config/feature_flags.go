@@ -83,7 +83,7 @@ const (
 	enableAPIFields                     = "enable-api-fields"
 	sendCloudEventsForRuns              = "send-cloudevents-for-runs"
 	embeddedStatus                      = "embedded-status"
-	verificationMode                  = "resource-verification-mode"
+	verificationMode                    = "resource-verification-mode"
 )
 
 // FeatureFlags holds the features configurations

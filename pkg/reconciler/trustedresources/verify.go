@@ -29,7 +29,6 @@ import (
 
 	"github.com/sigstore/sigstore/pkg/cryptoutils"
 	"github.com/sigstore/sigstore/pkg/signature"
-	"github.com/sigstore/sigstore/pkg/signature/kms"
 	"github.com/tektoncd/pipeline/pkg/apis/config"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -183,12 +182,6 @@ func loadPublicKey(ctx context.Context, keyRef string) (verifier signature.Verif
 // verifierForKeyRef parses the given keyRef, loads the key and returns an appropriate
 // verifier using the provided hash algorithm
 func verifierForKeyRef(ctx context.Context, keyRef string, hashAlgorithm crypto.Hash) (verifier signature.Verifier, err error) {
-	// The key could be plaintext, in a file, at a URL, or in KMS.
-	if kmsKey, err := kms.Get(ctx, keyRef, hashAlgorithm); err == nil {
-		// KMS specified
-		return kmsKey, nil
-	}
-
 	raw, err := os.ReadFile(filepath.Clean(keyRef))
 	if err != nil {
 		return nil, err

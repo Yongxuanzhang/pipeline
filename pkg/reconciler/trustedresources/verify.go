@@ -158,7 +158,6 @@ func prepareObjectMeta(in metav1.ObjectMeta) (metav1.ObjectMeta, []byte, error) 
 
 // getVerifiers get all verifiers from configmap
 func getVerifiers(ctx context.Context) ([]signature.Verifier, error) {
-	// Check if kms is configured, if not check if cosign key configured.
 	cfg := config.FromContextOrDefaults(ctx)
 	verifiers := []signature.Verifier{}
 

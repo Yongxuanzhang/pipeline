@@ -5711,6 +5711,8 @@ Resource Types:
 <ul><li>
 <a href="#tekton.dev/v1alpha1.Run">Run</a>
 </li><li>
+<a href="#tekton.dev/v1alpha1.VerificationPolicy">VerificationPolicy</a>
+</li><li>
 <a href="#tekton.dev/v1alpha1.PipelineResource">PipelineResource</a>
 </li></ul>
 <h3 id="tekton.dev/v1alpha1.Run">Run
@@ -5928,6 +5930,84 @@ RunStatus
 </tr>
 </tbody>
 </table>
+<h3 id="tekton.dev/v1alpha1.VerificationPolicy">VerificationPolicy
+</h3>
+<div>
+<p>VerificationPolicy</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>apiVersion</code><br/>
+string</td>
+<td>
+<code>
+tekton.dev/v1alpha1
+</code>
+</td>
+</tr>
+<tr>
+<td>
+<code>kind</code><br/>
+string
+</td>
+<td><code>VerificationPolicy</code></td>
+</tr>
+<tr>
+<td>
+<code>metadata</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.23/#objectmeta-v1-meta">
+Kubernetes meta/v1.ObjectMeta
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+Refer to the Kubernetes API documentation for the fields of the
+<code>metadata</code> field.
+</td>
+</tr>
+<tr>
+<td>
+<code>spec</code><br/>
+<em>
+<a href="#tekton.dev/v1alpha1.VerificationPolicySpec">
+VerificationPolicySpec
+</a>
+</em>
+</td>
+<td>
+<p>Spec holds the desired state of the VerificationPolicy.</p>
+<br/>
+<br/>
+<table>
+<tr>
+<td>
+<code>resourcespolicymapping</code><br/>
+<em>
+<a href="#tekton.dev/v1alpha1.Authority">
+map[github.com/tektoncd/pipeline/pkg/apis/pipeline/v1alpha1.ResourcePattern][]github.com/tektoncd/pipeline/pkg/apis/pipeline/v1alpha1.Authority
+</a>
+</em>
+</td>
+<td>
+<p>Resources defines the patterns of Resources names that should be subject to this policy. For example, we may want to apply this Policy only from a certain github repo. Then the ResourcesPattern should include the path. If using gitresolver, and we want to config keys from a certain git repo. <code>ResourcesPattern</code> can be <code>https://github.com/tektoncd/catalog.git</code>, we will use regex to filter out those resources.
+Resources []ResourcePattern <code>json:&quot;resources&quot;</code></p>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="tekton.dev/v1alpha1.PipelineResource">PipelineResource
 </h3>
 <div>
@@ -6058,6 +6138,50 @@ the controller, but was unused as there is no controller for PipelineResource.</
 </tr>
 </tbody>
 </table>
+<h3 id="tekton.dev/v1alpha1.Authority">Authority
+</h3>
+<p>
+(<em>Appears on:</em><a href="#tekton.dev/v1alpha1.VerificationPolicySpec">VerificationPolicySpec</a>)
+</p>
+<div>
+<p>The authorities block defines the rules for discovering and
+validating signatures.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Name is the name for this authority.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>key</code><br/>
+<em>
+<a href="#tekton.dev/v1alpha1.KeyRef">
+KeyRef
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Key defines the type of key to validate the resource.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="tekton.dev/v1alpha1.EmbeddedRunSpec">EmbeddedRunSpec
 </h3>
 <p>
@@ -6125,6 +6249,87 @@ structs.</p>
 </td>
 </tr>
 </table>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="tekton.dev/v1alpha1.KeyRef">KeyRef
+</h3>
+<p>
+(<em>Appears on:</em><a href="#tekton.dev/v1alpha1.Authority">Authority</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>secretRef</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.23/#secretreference-v1-core">
+Kubernetes core/v1.SecretReference
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>SecretRef sets a reference to a secret with the key.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>data</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Data contains the inline public key.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>kms</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>KMS contains the KMS url of the public key
+Supported formats differ based on the KMS system used.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="tekton.dev/v1alpha1.ResourcePattern">ResourcePattern
+</h3>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>pattern</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Pattern defines a resource pattern. Regex is created to filter resources based on <code>Pattern</code></p>
 </td>
 </tr>
 </tbody>
@@ -6301,6 +6506,37 @@ Refer Go&rsquo;s ParseDuration documentation for expected format: <a href="https
 <div>
 <p>RunSpecStatusMessage defines human readable status messages for the TaskRun.</p>
 </div>
+<h3 id="tekton.dev/v1alpha1.VerificationPolicySpec">VerificationPolicySpec
+</h3>
+<p>
+(<em>Appears on:</em><a href="#tekton.dev/v1alpha1.VerificationPolicy">VerificationPolicy</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>resourcespolicymapping</code><br/>
+<em>
+<a href="#tekton.dev/v1alpha1.Authority">
+map[github.com/tektoncd/pipeline/pkg/apis/pipeline/v1alpha1.ResourcePattern][]github.com/tektoncd/pipeline/pkg/apis/pipeline/v1alpha1.Authority
+</a>
+</em>
+</td>
+<td>
+<p>Resources defines the patterns of Resources names that should be subject to this policy. For example, we may want to apply this Policy only from a certain github repo. Then the ResourcesPattern should include the path. If using gitresolver, and we want to config keys from a certain git repo. <code>ResourcesPattern</code> can be <code>https://github.com/tektoncd/catalog.git</code>, we will use regex to filter out those resources.
+Resources []ResourcePattern <code>json:&quot;resources&quot;</code></p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="tekton.dev/v1alpha1.PipelineResourceSpec">PipelineResourceSpec
 </h3>
 <p>
@@ -6753,7 +6989,7 @@ Resource Types:
 <div>
 <p>ClusterTask is a Task with a cluster scope. ClusterTasks are used to
 represent Tasks that should be publicly addressable from any namespace in the
-cluster.</p>
+cluster. Deprecated: Please use the cluster resolver instead.</p>
 </div>
 <table>
 <thead>

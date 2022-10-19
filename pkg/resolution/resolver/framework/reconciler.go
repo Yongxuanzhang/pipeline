@@ -220,6 +220,5 @@ func (r *Reconciler) writeResolvedData(ctx context.Context, rr *v1beta1.Resoluti
 			Original:             err,
 		})
 	}
-
 	return nil
 }

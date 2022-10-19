@@ -28,6 +28,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-containerregistry/pkg/registry"
 	"github.com/tektoncd/pipeline/pkg/apis/config"
+	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1alpha1"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	"github.com/tektoncd/pipeline/pkg/client/clientset/versioned/fake"
 	internaltesting "github.com/tektoncd/pipeline/pkg/reconciler/internal/testing"
@@ -696,7 +697,23 @@ func TestLocalTaskRef_TrustedResourceVerification(t *testing.T) {
 	}
 	tamperedTask.Annotations["random"] = "attack"
 
-	tektonclient := fake.NewSimpleClientset(signedTask, unsignedTask, tamperedTask)
+	vp:=v1alpha1.VerificationPolicy{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "tekton.dev/v1alpha1",
+			Kind:       "VerificationPolicy"},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "policy",
+			Namespace: unsignedTask.Namespace,
+		},
+		Spec: v1alpha1.VerificationPolicySpec{
+			ResourcesPolicyMapping: map[v1alpha1.ResourcePattern][]v1alpha1.Authority{
+				{Pattern: "resource"}:{v1alpha1.Authority{Name: "key1", Key: &v1alpha1.KeyRef{Data:"sss"}}},
+			},
+
+		},
+
+	}
+	tektonclient := fake.NewSimpleClientset(signedTask, unsignedTask, tamperedTask,&vp)
 	testcases := []struct {
 		name                     string
 		ref                      *v1beta1.TaskRef

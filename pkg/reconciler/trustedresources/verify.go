@@ -30,8 +30,11 @@ import (
 	"github.com/sigstore/sigstore/pkg/cryptoutils"
 	"github.com/sigstore/sigstore/pkg/signature"
 	"github.com/tektoncd/pipeline/pkg/apis/config"
+	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1alpha1"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	kubeclient "knative.dev/pkg/client/injection/kube/client"
+	"knative.dev/pkg/logging"
 )
 
 const (
@@ -62,7 +65,7 @@ func VerifyInterface(
 }
 
 // VerifyTask verifies the signature and public key against task
-func VerifyTask(ctx context.Context, taskObj v1beta1.TaskObject) error {
+func VerifyTask(ctx context.Context, taskObj v1beta1.TaskObject, verificationPolicy *v1alpha1.VerificationPolicyList) error {
 	tm, signature, err := prepareObjectMeta(taskObj.TaskMetadata())
 	if err != nil {
 		return err
@@ -74,7 +77,8 @@ func VerifyTask(ctx context.Context, taskObj v1beta1.TaskObject) error {
 		ObjectMeta: tm,
 		Spec:       taskObj.TaskSpec(),
 	}
-	verifiers, err := getVerifiers(ctx)
+
+	verifiers, err := getVerifiers(ctx, verificationPolicy)
 	if err != nil {
 		return err
 	}
@@ -87,7 +91,7 @@ func VerifyTask(ctx context.Context, taskObj v1beta1.TaskObject) error {
 }
 
 // VerifyPipeline verifies the signature and public key against pipeline
-func VerifyPipeline(ctx context.Context, pipelineObj v1beta1.PipelineObject) error {
+func VerifyPipeline(ctx context.Context, pipelineObj v1beta1.PipelineObject, verificationPolicy *v1alpha1.VerificationPolicyList) error {
 	pm, signature, err := prepareObjectMeta(pipelineObj.PipelineMetadata())
 	if err != nil {
 		return err
@@ -99,7 +103,7 @@ func VerifyPipeline(ctx context.Context, pipelineObj v1beta1.PipelineObject) err
 		ObjectMeta: pm,
 		Spec:       pipelineObj.PipelineSpec(),
 	}
-	verifiers, err := getVerifiers(ctx)
+	verifiers, err := getVerifiers(ctx, verificationPolicy)
 	if err != nil {
 		return err
 	}
@@ -157,9 +161,41 @@ func prepareObjectMeta(in metav1.ObjectMeta) (metav1.ObjectMeta, []byte, error) 
 }
 
 // getVerifiers get all verifiers from configmap
-func getVerifiers(ctx context.Context) ([]signature.Verifier, error) {
+func getVerifiers(ctx context.Context, verificationPolicy *v1alpha1.VerificationPolicyList) ([]signature.Verifier, error) {
 	cfg := config.FromContextOrDefaults(ctx)
 	verifiers := []signature.Verifier{}
+	// TODO: use configsource to filter out resources
+	if verificationPolicy!=nil{
+		for _,v :=range verificationPolicy.Items{
+			fmt.Println(v.Spec.ResourcesPolicyMapping)
+			for resource, authorities := range v.Spec.ResourcesPolicyMapping{
+
+				for _,a := range authorities {
+					if a.Key.SecretRef!=nil{
+						//secret
+						k8sclient := kubeclient.Get(ctx)
+						secret,err:=k8sclient.CoreV1().Secrets(a.Key.SecretRef.Namespace).Get(ctx, a.Key.SecretRef.Name, metav1.GetOptions{})
+						if err!=nil{
+							return nil, err
+						}
+						fmt.Println(secret.Data)
+						for k, v := range secret.Data {
+							logging.FromContext(ctx).Infof("inlining secret %q key %q", a.Key.SecretRef.Name, k)
+							publicKey, err := cryptoutils.UnmarshalPEMToPublicKey(v)
+							if err != nil || publicKey == nil {
+								return nil, fmt.Errorf("secret %q contains an invalid public key: %w", a.Key.SecretRef.Name, err)
+							}
+							a.Key.Data = string(v)
+							a.Key.SecretRef = nil
+						}
+					}
+				}
+
+				fmt.Println(resource.Pattern)
+				fmt.Println(authorities)
+			}
+		}
+	}
 
 	// TODO(#5527): consider using k8s://namespace/name instead of mounting files.
 	for key := range cfg.TrustedResources.Keys {

@@ -1269,7 +1269,6 @@ spec:
 
 			wantEvents := append(tc.wantEvents, "Warning InternalError 1 error occurred") //nolint
 			reconciledRun, _ := prt.reconcileRun("foo", tc.pipelineRun.Name, wantEvents, tc.permanentError)
-
 			if reconciledRun.Status.CompletionTime == nil {
 				t.Errorf("Expected a CompletionTime on invalid PipelineRun but was nil")
 			}

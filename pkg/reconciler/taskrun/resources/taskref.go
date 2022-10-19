@@ -100,7 +100,7 @@ func GetTaskFunc(ctx context.Context, k8s kubernetes.Interface, tekton clientset
 			}
 			resolver := oci.NewResolver(tr.Bundle, kc)
 
-			return resolveTask(ctx, resolver, name, kind)
+			return resolveTask(ctx, resolver, name, kind, tekton)
 		}, nil
 	case tr != nil && tr.Resolver != "" && requester != nil:
 		// Return an inline function that implements GetTask by calling Resolver.Get with the specified task type and
@@ -120,7 +120,7 @@ func GetTaskFunc(ctx context.Context, k8s kubernetes.Interface, tekton clientset
 				replacedParams = append(replacedParams, tr.Params...)
 			}
 			resolver := resolution.NewResolver(requester, owner, string(tr.Resolver), trName, namespace, replacedParams)
-			return resolveTask(ctx, resolver, name, kind)
+			return resolveTask(ctx, resolver, name, kind, tekton)
 		}, nil
 
 	default:
@@ -138,7 +138,7 @@ func GetTaskFunc(ctx context.Context, k8s kubernetes.Interface, tekton clientset
 // fetch a task with given name. An error is returned if the
 // remoteresource doesn't work or the returned data isn't a valid
 // v1beta1.TaskObject.
-func resolveTask(ctx context.Context, resolver remote.Resolver, name string, kind v1beta1.TaskKind) (v1beta1.TaskObject, error) {
+func resolveTask(ctx context.Context, resolver remote.Resolver, name string, kind v1beta1.TaskKind, tekton clientset.Interface) (v1beta1.TaskObject, error) {
 	// Because the resolver will only return references with the same kind (eg ClusterTask), this will ensure we
 	// don't accidentally return a Task with the same name but different kind.
 	obj, err := resolver.Get(ctx, strings.TrimSuffix(strings.ToLower(string(kind)), "s"), name)
@@ -149,7 +149,8 @@ func resolveTask(ctx context.Context, resolver remote.Resolver, name string, kin
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert obj %s into Task", obj.GetObjectKind().GroupVersionKind().String())
 	}
-	if err := verifyResolvedTask(ctx, taskObj); err != nil {
+
+	if err := verifyResolvedTask(ctx, taskObj, tekton); err != nil {
 		return nil, err
 	}
 	return taskObj, nil
@@ -193,7 +194,7 @@ func (l *LocalTaskRefResolver) GetTask(ctx context.Context, name string) (v1beta
 	if err != nil {
 		return nil, err
 	}
-	if err := verifyResolvedTask(ctx, task.DeepCopy()); err != nil {
+	if err := verifyResolvedTask(ctx, task.DeepCopy(), l.Tektonclient); err != nil {
 		return nil, err
 	}
 	return task, nil
@@ -205,10 +206,15 @@ func IsGetTaskErrTransient(err error) bool {
 }
 
 // verifyResolvedTask verifies the resolved task
-func verifyResolvedTask(ctx context.Context, task v1beta1.TaskObject) error {
+func verifyResolvedTask(ctx context.Context, task v1beta1.TaskObject, tekton clientset.Interface) error {
 	cfg := config.FromContextOrDefaults(ctx)
+	vp, err:= tekton.TektonV1alpha1().VerificationPolicies(task.TaskMetadata().Namespace).List(ctx, metav1.ListOptions{})
+	if err!=nil{
+		return err
+	}
+
 	if (cfg.FeatureFlags.ResourceVerificationMode == config.EnforceResourceVerificationMode || cfg.FeatureFlags.ResourceVerificationMode == config.WarnResourceVerificationMode) && cfg.FeatureFlags.EnableAPIFields == config.AlphaAPIFields {
-		if err := trustedresources.VerifyTask(ctx, task.Copy()); err != nil {
+		if err := trustedresources.VerifyTask(ctx, task.Copy(), vp); err != nil {
 			if cfg.FeatureFlags.ResourceVerificationMode == config.EnforceResourceVerificationMode {
 				return trustedresources.ErrorResourceVerificationFailed
 			}

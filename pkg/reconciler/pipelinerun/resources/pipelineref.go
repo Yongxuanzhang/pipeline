@@ -70,7 +70,7 @@ func GetPipelineFunc(ctx context.Context, k8s kubernetes.Interface, tekton clien
 				return nil, fmt.Errorf("failed to get keychain: %w", err)
 			}
 			resolver := oci.NewResolver(pr.Bundle, kc)
-			return resolvePipeline(ctx, resolver, name)
+			return resolvePipeline(ctx, resolver, name, tekton)
 		}, nil
 	case pr != nil && pr.Resolver != "" && requester != nil:
 		return func(ctx context.Context, name string) (v1beta1.PipelineObject, error) {
@@ -80,7 +80,7 @@ func GetPipelineFunc(ctx context.Context, k8s kubernetes.Interface, tekton clien
 			}
 			replacedParams := replaceParamValues(pr.Params, stringReplacements, arrayReplacements, objectReplacements)
 			resolver := resolution.NewResolver(requester, pipelineRun, string(pr.Resolver), "", "", replacedParams)
-			return resolvePipeline(ctx, resolver, name)
+			return resolvePipeline(ctx, resolver, name, tekton)
 		}, nil
 	default:
 		// Even if there is no task ref, we should try to return a local resolver.
@@ -110,7 +110,7 @@ func (l *LocalPipelineRefResolver) GetPipeline(ctx context.Context, name string)
 	if err != nil {
 		return nil, err
 	}
-	if err := verifyResolvedPipeline(ctx, pipeline.DeepCopy()); err != nil {
+	if err := verifyResolvedPipeline(ctx, pipeline.DeepCopy(), l.Tektonclient); err != nil {
 		return nil, err
 	}
 	return pipeline, nil
@@ -120,7 +120,7 @@ func (l *LocalPipelineRefResolver) GetPipeline(ctx context.Context, name string)
 // fetch a pipeline with given name. An error is returned if the
 // resolution doesn't work or the returned data isn't a valid
 // v1beta1.PipelineObject.
-func resolvePipeline(ctx context.Context, resolver remote.Resolver, name string) (v1beta1.PipelineObject, error) {
+func resolvePipeline(ctx context.Context, resolver remote.Resolver, name string, tekton clientset.Interface ) (v1beta1.PipelineObject, error) {
 	obj, err := resolver.Get(ctx, "pipeline", name)
 	if err != nil {
 		return nil, err
@@ -129,7 +129,7 @@ func resolvePipeline(ctx context.Context, resolver remote.Resolver, name string)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert obj %s into Pipeline", obj.GetObjectKind().GroupVersionKind().String())
 	}
-	if err := verifyResolvedPipeline(ctx, pipelineObj); err != nil {
+	if err := verifyResolvedPipeline(ctx, pipelineObj, tekton); err != nil {
 		return nil, err
 	}
 	return pipelineObj, nil
@@ -149,10 +149,14 @@ func readRuntimeObjectAsPipeline(ctx context.Context, obj runtime.Object) (v1bet
 }
 
 // verifyResolvedPipeline verifies the resolved pipeline
-func verifyResolvedPipeline(ctx context.Context, pipeline v1beta1.PipelineObject) error {
+func verifyResolvedPipeline(ctx context.Context, pipeline v1beta1.PipelineObject, tekton clientset.Interface) error {
 	cfg := config.FromContextOrDefaults(ctx)
+	vp, err:= tekton.TektonV1alpha1().VerificationPolicies(pipeline.PipelineMetadata().Namespace).List(ctx, metav1.ListOptions{})
+	if err!=nil{
+		return err
+	}
 	if cfg.FeatureFlags.ResourceVerificationMode != config.SkipResourceVerificationMode && cfg.FeatureFlags.EnableAPIFields == config.AlphaAPIFields {
-		if err := trustedresources.VerifyPipeline(ctx, pipeline.Copy()); err != nil {
+		if err := trustedresources.VerifyPipeline(ctx, pipeline.Copy(),vp); err != nil {
 			if cfg.FeatureFlags.ResourceVerificationMode == config.EnforceResourceVerificationMode {
 				return trustedresources.ErrorResourceVerificationFailed
 			}

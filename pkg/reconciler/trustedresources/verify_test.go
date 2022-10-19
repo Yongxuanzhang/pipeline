@@ -143,7 +143,7 @@ func TestVerifyTask(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
-			err := VerifyTask(ctx, tc.task)
+			err := VerifyTask(ctx, tc.task, nil)
 			if (err != nil) != tc.wantErr {
 				t.Fatalf("verifyTaskRun() get err %v, wantErr %t", err, tc.wantErr)
 			}
@@ -193,7 +193,7 @@ func TestVerifyPipeline(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
-			err := VerifyPipeline(ctx, tc.pipeline)
+			err := VerifyPipeline(ctx, tc.pipeline, nil)
 			if (err != nil) != tc.wantErr {
 				t.Fatalf("VerifyPipeline() get err %v, wantErr %t", err, tc.wantErr)
 			}

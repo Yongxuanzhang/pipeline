@@ -22,6 +22,8 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/x509"
+	"encoding/pem"
 	"os"
 	"path/filepath"
 	"testing"
@@ -30,6 +32,7 @@ import (
 	"github.com/sigstore/sigstore/pkg/signature"
 	"github.com/tektoncd/pipeline/pkg/apis/config"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
+	"github.com/theupdateframework/go-tuf/encrypted"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -131,6 +134,57 @@ func GetSignerFromFile(ctx context.Context, t *testing.T) (signature.Signer, str
 	}
 
 	return sv, filepath.Join(tmpDir, publicKeyFile), nil
+}
+
+// PassFunc is the function to be called to retrieve the signer password. If
+// nil, then it assumes that no password is provided.
+type PassFunc func(bool) ([]byte, error)
+
+// GenerateKeyFile creates public key files, return the SignerVerifier
+func GetKeyBytes(pf PassFunc) (signature.SignerVerifier, []byte,[]byte, error) {
+	keys, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		return nil, nil,nil, err
+	}
+
+	x509Encoded, err := x509.MarshalPKCS8PrivateKey(keys)
+	if err != nil {
+		return nil, nil,nil, err
+	}
+
+	password := []byte{}
+	if pf != nil {
+		password, err = pf(true)
+		if err != nil {
+			return nil, nil,nil, err
+		}
+	}
+
+	encBytes, err := encrypted.Encrypt(x509Encoded, password)
+	if err != nil {
+		return nil, nil,nil, err
+	}
+
+	privBytes := pem.EncodeToMemory(&pem.Block{
+		Bytes: encBytes,
+		Type:  "EC PRIVATE KEY",
+	})
+	if err != nil {
+		return nil,nil,nil, err
+	}
+
+	// Now do the public key
+	pubBytes, err := cryptoutils.MarshalPublicKeyToPEM(keys.Public())
+	if err != nil {
+		return  nil,nil,nil, err
+	}
+
+	sv, err := signature.LoadSignerVerifier(keys, crypto.SHA256)
+	if err != nil {
+		return nil,nil,nil, err
+	}
+
+	return sv, privBytes, pubBytes, nil
 }
 
 // GenerateKeyFile creates public key files, return the SignerVerifier

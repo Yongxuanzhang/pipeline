@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/sigstore/sigstore/pkg/cryptoutils"
 	"github.com/sigstore/sigstore/pkg/signature"
@@ -185,10 +186,25 @@ func getVerifiers(ctx context.Context, verificationPolicy *v1alpha1.Verification
 							if err != nil || publicKey == nil {
 								return nil, fmt.Errorf("secret %q contains an invalid public key: %w", a.Key.SecretRef.Name, err)
 							}
+							algorithm, err := HashAlgorithm(a.Key.HashAlgorithm)
+							verifier, err := signature.LoadVerifier(publicKey, algorithm)
+							if err == nil {
+								verifiers = append(verifiers, verifier)
+							}
 							a.Key.Data = string(v)
 							a.Key.SecretRef = nil
 						}
+					}else if a.Key.Data != ""{
+						publicKey, err := cryptoutils.UnmarshalPEMToPublicKey([]byte(a.Key.Data))
+						if err != nil || publicKey == nil {
+							return nil, fmt.Errorf("authority %q contains an invalid public key: %w", a.Name, err)
+						}
+						verifier, err := signature.LoadVerifier(publicKey, crypto.SHA256)
+						if err == nil {
+							verifiers = append(verifiers, verifier)
+						}
 					}
+
 				}
 
 				fmt.Println(resource.Pattern)
@@ -228,4 +244,29 @@ func verifierForKeyRef(ctx context.Context, keyRef string, hashAlgorithm crypto.
 	}
 
 	return signature.LoadVerifier(pubKey, hashAlgorithm)
+}
+
+// HashAlgorithm returns a crypto.Hash code using an algorithm name as input parameter
+func HashAlgorithm(algorithmName string) (crypto.Hash, error) {
+	if algorithmName == "" {
+		return crypto.SHA256, nil
+	}
+	normalizedAlgo := strings.ToLower(strings.TrimSpace(algorithmName))
+
+	algo, exists := supportedSignatureAlgorithms[normalizedAlgo]
+	if !exists {
+		return crypto.SHA256, fmt.Errorf("unknown digest algorithm: %s", algorithmName)
+	}
+
+	return algo, nil
+}
+
+var DefaultSignatureAlgorithm = "sha256"
+
+// supportedSignatureAlgorithms sets a list of support signature algorithms that is similar to the list supported by cosign
+var supportedSignatureAlgorithms = map[string]crypto.Hash{
+	"sha224": crypto.SHA224,
+	"sha256": crypto.SHA256,
+	"sha384": crypto.SHA384,
+	"sha512": crypto.SHA512,
 }

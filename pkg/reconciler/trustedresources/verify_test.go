@@ -25,6 +25,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/sigstore/sigstore/pkg/signature"
 	"github.com/tektoncd/pipeline/pkg/apis/config"
+	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1alpha1"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	internaltesting "github.com/tektoncd/pipeline/pkg/reconciler/internal/testing"
 	"github.com/tektoncd/pipeline/test/diff"
@@ -144,6 +145,85 @@ func TestVerifyTask(t *testing.T) {
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
 			err := VerifyTask(ctx, tc.task, nil)
+			if (err != nil) != tc.wantErr {
+				t.Fatalf("verifyTaskRun() get err %v, wantErr %t", err, tc.wantErr)
+			}
+		})
+	}
+
+}
+
+func pass(s string) internaltesting.PassFunc {
+	return func(_ bool) ([]byte, error) {
+		return []byte(s), nil
+	}
+}
+
+func TestVerifyTask_VerificationPolicy(t *testing.T) {
+	ctx := logging.WithLogger(context.Background(), zaptest.NewLogger(t).Sugar())
+
+	sv, _, pub, err := internaltesting.GetKeyBytes(pass("1234"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	verificationpolicy := v1alpha1.VerificationPolicyList{
+		TypeMeta: metav1.TypeMeta{
+			Kind: "VerificationPolicyList",
+			APIVersion: "v1alpha1",
+		},
+		Items: []v1alpha1.VerificationPolicy{
+			{
+				TypeMeta: metav1.TypeMeta{
+					Kind: "VerificationPolicy",
+					APIVersion: "v1alpha1",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-policy",
+				},
+				Spec: v1alpha1.VerificationPolicySpec{
+					ResourcesPolicyMapping: map[v1alpha1.ResourcePattern][]v1alpha1.Authority{
+						{Pattern: "resource"}:{v1alpha1.Authority{Name: "key1", Key: &v1alpha1.KeyRef{Data:string(pub)}}},
+					},
+				},
+			},
+		},
+	}
+
+	ctx = internaltesting.SetupTrustedResourceConfig(ctx, "", config.EnforceResourceVerificationMode)
+
+	unsignedTask := internaltesting.GetUnsignedTask("test-task")
+
+	signedTask, err := GetSignedTask(unsignedTask, sv, "signed")
+	if err != nil {
+		t.Fatal("fail to sign task", err)
+	}
+
+	tamperedTask := signedTask.DeepCopy()
+	tamperedTask.Annotations["random"] = "attack"
+
+	tcs := []struct {
+		name    string
+		task    v1beta1.TaskObject
+		wantErr bool
+	}{{
+		name:    "Signed Task Passes Verification",
+		task:    signedTask,
+		wantErr: false,
+	}, {
+		name:    "Tampered Task Fails Verification with tampered content",
+		task:    tamperedTask,
+		wantErr: true,
+	}, {
+		name:    "Unsigned Task Fails Verification without signature",
+		task:    unsignedTask,
+		wantErr: true,
+	},
+	}
+
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			err := VerifyTask(ctx, tc.task, &verificationpolicy)
 			if (err != nil) != tc.wantErr {
 				t.Fatalf("verifyTaskRun() get err %v, wantErr %t", err, tc.wantErr)
 			}

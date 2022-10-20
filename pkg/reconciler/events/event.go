@@ -18,6 +18,7 @@ package events
 
 import (
 	"context"
+	"sync"
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
 	"github.com/tektoncd/pipeline/pkg/apis/config"
@@ -61,10 +62,12 @@ func Emit(ctx context.Context, beforeCondition *apis.Condition, afterCondition *
 	if sendCloudEvents {
 		// Only send events if the new condition represents a change
 		if !equality.Semantic.DeepEqual(beforeCondition, afterCondition) {
-			err := cloudevent.SendCloudEventWithRetries(ctx, object)
+			var wg sync.WaitGroup
+			err := cloudevent.SendCloudEventWithRetries(ctx, &wg, object)
 			if err != nil {
 				logger.Warnf("Failed to emit cloud events %v", err.Error())
 			}
+			wg.Wait()
 		}
 	}
 }
@@ -79,10 +82,12 @@ func EmitCloudEvents(ctx context.Context, object runtime.Object) {
 	}
 
 	if sendCloudEvents {
-		err := cloudevent.SendCloudEventWithRetries(ctx, object)
+		var wg sync.WaitGroup
+		err := cloudevent.SendCloudEventWithRetries(ctx, &wg, object)
 		if err != nil {
 			logger.Warnf("Failed to emit cloud events %v", err.Error())
 		}
+		wg.Wait()
 	}
 }
 

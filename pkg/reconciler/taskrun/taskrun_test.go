@@ -706,6 +706,7 @@ spec:
 		`(?s)dev.tekton.event.taskrun.running.v1.*test-taskrun-not-started`,
 	}
 	ceClient := clients.CloudEvents.(cloudevent.FakeClient)
+	//ceClient.Wg.Wait()
 	err = eventstest.CheckEventsUnordered(t, ceClient.Events, "reconcile-cloud-events", wantCloudEvents)
 	if !(err == nil) {
 		t.Errorf(err.Error())

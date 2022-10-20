@@ -146,6 +146,8 @@ func initializePipelineRunControllerAssets(t *testing.T, d test.Data, opts pipel
 	if err := configMapWatcher.Start(ctx.Done()); err != nil {
 		t.Fatalf("error starting configmap watcher: %v", err)
 	}
+
+
 	return test.Assets{
 		Logger:     logging.FromContext(ctx),
 		Clients:    c,
@@ -1264,7 +1266,8 @@ spec:
 			}
 			prt := newPipelineRunTest(d, t)
 			defer prt.Cancel()
-
+			// wait until all events are emitted
+			//prt.TestAssets.Recorder.Wg.Wait()
 			wantEvents := append(tc.wantEvents, "Warning InternalError 1 error occurred") //nolint
 			reconciledRun, _ := prt.reconcileRun("foo", tc.pipelineRun.Name, wantEvents, tc.permanentError)
 

@@ -37,6 +37,7 @@ type FakeClient struct {
 	behaviour *FakeClientBehaviour
 	// Modelled after k8s.io/client-go fake recorder
 	Events chan string
+	//Wg  sync.WaitGroup
 }
 
 // newFakeClient is a FakeClient factory, it returns a client for the target

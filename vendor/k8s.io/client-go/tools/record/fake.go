@@ -42,12 +42,16 @@ func objectString(object runtime.Object, includeObject bool) string {
 }
 
 func (f *FakeRecorder) Event(object runtime.Object, eventtype, reason, message string) {
+	fmt.Println("!!!!here")
+	//time.Sleep(500 * time.Millisecond)
 	if f.Events != nil {
 		f.Events <- fmt.Sprintf("%s %s %s%s", eventtype, reason, message, objectString(object, f.IncludeObject))
 	}
 }
 
 func (f *FakeRecorder) Eventf(object runtime.Object, eventtype, reason, messageFmt string, args ...interface{}) {
+	fmt.Println("!!!!there")
+	//time.Sleep(500 * time.Millisecond)
 	if f.Events != nil {
 		f.Events <- fmt.Sprintf(eventtype+" "+reason+" "+messageFmt, args...) + objectString(object, f.IncludeObject)
 	}

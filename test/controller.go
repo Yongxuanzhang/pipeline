@@ -19,6 +19,7 @@ package test
 import (
 	"context"
 	"fmt"
+	"sync"
 	"sync/atomic"
 	"testing"
 
@@ -119,6 +120,53 @@ type Assets struct {
 	Recorder   *record.FakeRecorder
 	Ctx        context.Context
 }
+
+// erKey is used to associate record.EventRecorders with contexts.
+type erKey struct{}
+
+func GetEventRecorder(ctx context.Context) *FakeRecorder {
+	untyped := ctx.Value(erKey{})
+	if untyped == nil {
+		return nil
+	}
+	return untyped.(*FakeRecorder)
+}
+
+type FakeRecorder struct {
+	//record.FakeRecorder
+	Events chan string
+	IncludeObject bool
+	Wg sync.WaitGroup
+}
+
+func (f *FakeRecorder) Event(object runtime.Object, eventtype, reason, message string) {
+	if f.Events != nil {
+		f.Events <- fmt.Sprintf("%s %s %s%s", eventtype, reason, message, objectString(object, f.IncludeObject))
+	}
+	f.Wg.Add(1)
+}
+
+func (f *FakeRecorder) Eventf(object runtime.Object, eventtype, reason, messageFmt string, args ...interface{}) {
+	if f.Events != nil {
+		f.Events <- fmt.Sprintf(eventtype+" "+reason+" "+messageFmt, args...) + objectString(object, f.IncludeObject)
+	}
+	f.Wg.Add(1)
+}
+
+func (f *FakeRecorder) AnnotatedEventf(object runtime.Object, annotations map[string]string, eventtype, reason, messageFmt string, args ...interface{}) {
+	f.Eventf(object, eventtype, reason, messageFmt, args...)
+}
+
+func objectString(object runtime.Object, includeObject bool) string {
+	if !includeObject {
+		return ""
+	}
+	return fmt.Sprintf(" involvedObject{kind=%s,apiVersion=%s}",
+		object.GetObjectKind().GroupVersionKind().Kind,
+		object.GetObjectKind().GroupVersionKind().GroupVersion(),
+	)
+}
+
 
 // AddToInformer returns a function to add ktesting.Actions to the cache store
 func AddToInformer(t *testing.T, store cache.Store) func(ktesting.Action) (bool, runtime.Object, error) {

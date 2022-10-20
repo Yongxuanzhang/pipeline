@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -27,7 +27,7 @@ import (
 func CheckEventsOrdered(t *testing.T, eventChan chan string, testName string, wantEvents []string) error {
 	t.Helper()
 	// Sleep 50ms to make sure events have delivered
-	time.Sleep(50 * time.Millisecond)
+	//time.Sleep(50 * time.Millisecond)
 	err := eventsFromChannel(eventChan, wantEvents)
 	if err != nil {
 		return fmt.Errorf("error in test %s: %v", testName, err)
@@ -40,7 +40,7 @@ func CheckEventsOrdered(t *testing.T, eventChan chan string, testName string, wa
 func CheckEventsUnordered(t *testing.T, eventChan chan string, testName string, wantEvents []string) error {
 	t.Helper()
 	// Sleep 50ms to make sure events have delivered
-	time.Sleep(50 * time.Millisecond)
+	//time.Sleep(50 * time.Millisecond)
 	err := eventsFromChannelUnordered(eventChan, wantEvents)
 	if err != nil {
 		return fmt.Errorf("error in test %s: %v", testName, err)

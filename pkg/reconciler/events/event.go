@@ -48,7 +48,7 @@ const (
 //
 // k8s events are always sent if afterCondition is different from beforeCondition
 // Cloud events are always sent if enabled, i.e. if a sink is available
-func Emit(ctx context.Context, beforeCondition *apis.Condition, afterCondition *apis.Condition, object runtime.Object) {
+func Emit(ctx context.Context, beforeCondition *apis.Condition, afterCondition *apis.Condition, object runtime.Object, wg *sync.WaitGroup) {
 	recorder := controller.GetEventRecorder(ctx)
 	logger := logging.FromContext(ctx)
 	configs := config.FromContextOrDefaults(ctx)
@@ -62,8 +62,7 @@ func Emit(ctx context.Context, beforeCondition *apis.Condition, afterCondition *
 	if sendCloudEvents {
 		// Only send events if the new condition represents a change
 		if !equality.Semantic.DeepEqual(beforeCondition, afterCondition) {
-			var wg sync.WaitGroup
-			err := cloudevent.SendCloudEventWithRetries(ctx, &wg, object)
+			err := cloudevent.SendCloudEventWithRetries(ctx, wg, object)
 			if err != nil {
 				logger.Warnf("Failed to emit cloud events %v", err.Error())
 			}

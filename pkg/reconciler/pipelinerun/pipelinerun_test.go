@@ -6558,6 +6558,7 @@ spec:
 		`(?s)dev.tekton.event.pipelinerun.running.v1.*test-pipelinerun`,
 	}
 	ceClient := clients.CloudEvents.(cloudevent.FakeClient)
+	ceClient.Wait()
 	if err := eventstest.CheckEventsUnordered(t, ceClient.Events, "reconcile-cloud-events", wantCloudEvents); err != nil {
 		t.Errorf(err.Error())
 	}

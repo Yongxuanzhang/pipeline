@@ -235,7 +235,7 @@ func TestEmit(t *testing.T) {
 		ctx = config.ToContext(ctx, cfg)
 
 		recorder := controller.GetEventRecorder(ctx).(*record.FakeRecorder)
-		Emit(ctx, nil, after, object)
+		Emit(ctx, nil, after, object, nil)
 		if err := eventstest.CheckEventsOrdered(t, recorder.Events, tc.name, tc.wantEvents); err != nil {
 			t.Fatalf(err.Error())
 		}

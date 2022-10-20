@@ -147,6 +147,7 @@ func SendCloudEventWithRetries(ctx context.Context, wg *sync.WaitGroup,object ru
 	wasIn := make(chan error)
 	wg.Add(1)
 	go func() {
+
 		defer wg.Done()
 		wasIn <- nil
 		logger.Debugf("Sending cloudevent of type %q", event.Type())

@@ -18,6 +18,7 @@ package taskrun
 
 import (
 	"context"
+	"sync"
 
 	"github.com/tektoncd/pipeline/pkg/apis/config"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline"
@@ -56,6 +57,7 @@ func NewController(opts *pipeline.Options, clock clock.PassiveClock) func(contex
 		resolutionInformer := resolutioninformer.Get(ctx)
 		configStore := config.NewStore(logger.Named("config-store"), taskrunmetrics.MetricsOnStore(logger))
 		configStore.WatchConfigs(cmw)
+		var wg sync.WaitGroup
 
 		entrypointCache, err := pod.NewEntrypointCache(kubeclientset)
 		if err != nil {
@@ -73,6 +75,7 @@ func NewController(opts *pipeline.Options, clock clock.PassiveClock) func(contex
 			cloudEventClient:    cloudeventclient.Get(ctx),
 			metrics:             taskrunmetrics.Get(ctx),
 			entrypointCache:     entrypointCache,
+			wg: &wg,
 			podLister:           podInformer.Lister(),
 			pvcHandler:          volumeclaim.NewPVCHandler(kubeclientset, logger),
 			resolutionRequester: resolution.NewCRDRequester(resolutionclient.Get(ctx), resolutionInformer.Lister()),

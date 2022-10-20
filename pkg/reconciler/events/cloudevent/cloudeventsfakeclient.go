@@ -19,6 +19,7 @@ package cloudevent
 import (
 	"context"
 	"fmt"
+	"time"
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
 	"github.com/cloudevents/sdk-go/v2/protocol"
@@ -37,8 +38,8 @@ type FakeClient struct {
 	behaviour *FakeClientBehaviour
 	// Modelled after k8s.io/client-go fake recorder
 	Events chan string
-	//Wg  sync.WaitGroup
 }
+
 
 // newFakeClient is a FakeClient factory, it returns a client for the target
 func newFakeClient(behaviour *FakeClientBehaviour) cloudevents.Client {
@@ -53,6 +54,7 @@ var _ cloudevents.Client = (*FakeClient)(nil)
 // Send fakes the Send method from cloudevents.Client
 func (c FakeClient) Send(ctx context.Context, event cloudevents.Event) protocol.Result {
 	if c.behaviour.SendSuccessfully {
+		time.Sleep(50 * time.Millisecond)
 		c.Events <- fmt.Sprintf("%s", event.String())
 		return nil
 	}

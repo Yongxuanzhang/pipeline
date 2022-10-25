@@ -208,12 +208,11 @@ func IsGetTaskErrTransient(err error) bool {
 // verifyResolvedTask verifies the resolved task
 func verifyResolvedTask(ctx context.Context, task v1beta1.TaskObject, tekton clientset.Interface) error {
 	cfg := config.FromContextOrDefaults(ctx)
-	vp, err:= tekton.TektonV1alpha1().VerificationPolicies(task.TaskMetadata().Namespace).List(ctx, metav1.ListOptions{})
-	if err!=nil{
-		return err
-	}
-
 	if (cfg.FeatureFlags.ResourceVerificationMode == config.EnforceResourceVerificationMode || cfg.FeatureFlags.ResourceVerificationMode == config.WarnResourceVerificationMode) && cfg.FeatureFlags.EnableAPIFields == config.AlphaAPIFields {
+		vp, err:= tekton.TektonV1alpha1().VerificationPolicies(task.TaskMetadata().Namespace).List(ctx, metav1.ListOptions{})
+		if err!=nil{
+			return err
+		}
 		if err := trustedresources.VerifyTask(ctx, task.Copy(), vp); err != nil {
 			if cfg.FeatureFlags.ResourceVerificationMode == config.EnforceResourceVerificationMode {
 				return trustedresources.ErrorResourceVerificationFailed

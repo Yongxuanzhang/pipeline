@@ -594,7 +594,7 @@ func TestGetPipelineFunc_RemoteResolution_TrustedResourceVerification(t *testing
 	requesterTampered := test.NewRequester(resolvedTampered, nil)
 
 	pipelineRef := &v1beta1.PipelineRef{ResolverRef: v1beta1.ResolverRef{Resolver: "git"}}
-
+	tektonclient := fake.NewSimpleClientset()
 	testcases := []struct {
 		name                     string
 		requester                *test.Requester
@@ -668,7 +668,7 @@ func TestGetPipelineFunc_RemoteResolution_TrustedResourceVerification(t *testing
 					ServiceAccountName: "default",
 				},
 			}
-			fn, err := resources.GetPipelineFunc(ctx, nil, nil, tc.requester, pr)
+			fn, err := resources.GetPipelineFunc(ctx, nil, tektonclient, tc.requester, pr)
 			if err != nil {
 				t.Fatalf("failed to get pipeline fn: %s", err.Error())
 			}

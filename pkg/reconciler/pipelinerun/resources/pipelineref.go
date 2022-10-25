@@ -151,11 +151,11 @@ func readRuntimeObjectAsPipeline(ctx context.Context, obj runtime.Object) (v1bet
 // verifyResolvedPipeline verifies the resolved pipeline
 func verifyResolvedPipeline(ctx context.Context, pipeline v1beta1.PipelineObject, tekton clientset.Interface) error {
 	cfg := config.FromContextOrDefaults(ctx)
-	vp, err:= tekton.TektonV1alpha1().VerificationPolicies(pipeline.PipelineMetadata().Namespace).List(ctx, metav1.ListOptions{})
-	if err!=nil{
-		return err
-	}
 	if cfg.FeatureFlags.ResourceVerificationMode != config.SkipResourceVerificationMode && cfg.FeatureFlags.EnableAPIFields == config.AlphaAPIFields {
+		vp, err:= tekton.TektonV1alpha1().VerificationPolicies(pipeline.PipelineMetadata().Namespace).List(ctx, metav1.ListOptions{})
+		if err!=nil{
+			return err
+		}
 		if err := trustedresources.VerifyPipeline(ctx, pipeline.Copy(),vp); err != nil {
 			if cfg.FeatureFlags.ResourceVerificationMode == config.EnforceResourceVerificationMode {
 				return trustedresources.ErrorResourceVerificationFailed

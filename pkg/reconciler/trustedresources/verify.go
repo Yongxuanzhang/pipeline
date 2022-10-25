@@ -166,11 +166,10 @@ func getVerifiers(ctx context.Context, verificationPolicy *v1alpha1.Verification
 	cfg := config.FromContextOrDefaults(ctx)
 	verifiers := []signature.Verifier{}
 	// TODO: use configsource to filter out resources
-	if verificationPolicy!=nil{
+	if verificationPolicy!=nil&&len(verificationPolicy.Items)!=0{
 		for _,v :=range verificationPolicy.Items{
 			fmt.Println(v.Spec.ResourcesPolicyMapping)
-			for resource, authorities := range v.Spec.ResourcesPolicyMapping{
-
+			for _, authorities := range v.Spec.ResourcesPolicyMapping{
 				for _,a := range authorities {
 					if a.Key.SecretRef!=nil{
 						//secret
@@ -206,11 +205,9 @@ func getVerifiers(ctx context.Context, verificationPolicy *v1alpha1.Verification
 					}
 
 				}
-
-				fmt.Println(resource.Pattern)
-				fmt.Println(authorities)
 			}
 		}
+		return verifiers, nil
 	}
 
 	// TODO(#5527): consider using k8s://namespace/name instead of mounting files.

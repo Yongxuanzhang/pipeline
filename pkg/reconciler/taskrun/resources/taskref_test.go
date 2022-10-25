@@ -696,7 +696,11 @@ func TestLocalTaskRef_TrustedResourceVerification(t *testing.T) {
 		tamperedTask.Annotations = make(map[string]string)
 	}
 	tamperedTask.Annotations["random"] = "attack"
-
+	/*
+	signer, _, pub, err := internaltesting.GetKeyBytes(pass("1234"))
+	if err != nil {
+		t.Fatal(err)
+	}
 	vp:=v1alpha1.VerificationPolicy{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "tekton.dev/v1alpha1",
@@ -707,13 +711,11 @@ func TestLocalTaskRef_TrustedResourceVerification(t *testing.T) {
 		},
 		Spec: v1alpha1.VerificationPolicySpec{
 			ResourcesPolicyMapping: map[v1alpha1.ResourcePattern][]v1alpha1.Authority{
-				{Pattern: "resource"}:{v1alpha1.Authority{Name: "key1", Key: &v1alpha1.KeyRef{Data:"sss"}}},
+				{Pattern: "resource"}:{v1alpha1.Authority{Name: "key1", Key: &v1alpha1.KeyRef{Data:	string(pub)}}},
 			},
-
 		},
-
-	}
-	tektonclient := fake.NewSimpleClientset(signedTask, unsignedTask, tamperedTask,&vp)
+	}*/
+	tektonclient := fake.NewSimpleClientset(signedTask, unsignedTask, tamperedTask)
 	testcases := []struct {
 		name                     string
 		ref                      *v1beta1.TaskRef
@@ -817,6 +819,150 @@ func TestLocalTaskRef_TrustedResourceVerification(t *testing.T) {
 	}
 }
 
+func TestLocalTaskRef_TrustedResourceVerification_VerificationPolicy(t *testing.T) {
+	ctx := context.Background()
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	signer, _, pub, err := internaltesting.GetKeyBytes(pass("1234"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	unsignedTask := internaltesting.GetUnsignedTask("test-task")
+	signedTask, err := trustedresources.GetSignedTask(unsignedTask, signer, "test-signed")
+	if err != nil {
+		t.Fatal("fail to sign task", err)
+	}
+	// attack another signed task
+	signedTask2, err := trustedresources.GetSignedTask(internaltesting.GetUnsignedTask("test-task2"), signer, "test-signed2")
+	if err != nil {
+		t.Fatal("fail to sign task", err)
+	}
+
+	tamperedTask := signedTask2.DeepCopy()
+	if tamperedTask.Annotations == nil {
+		tamperedTask.Annotations = make(map[string]string)
+	}
+	tamperedTask.Annotations["random"] = "attack"
+
+	vp:=v1alpha1.VerificationPolicy{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "tekton.dev/v1alpha1",
+			Kind:       "VerificationPolicy"},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "policy",
+			Namespace: unsignedTask.Namespace,
+		},
+		Spec: v1alpha1.VerificationPolicySpec{
+			ResourcesPolicyMapping: map[v1alpha1.ResourcePattern][]v1alpha1.Authority{
+				{Pattern: "resource"}:{v1alpha1.Authority{Name: "key1", Key: &v1alpha1.KeyRef{Data:	string(pub)}}},
+			},
+		},
+	}
+
+	tektonclient := fake.NewSimpleClientset(signedTask, unsignedTask, tamperedTask, &vp)
+	testcases := []struct {
+		name                     string
+		ref                      *v1beta1.TaskRef
+		resourceVerificationMode string
+		expected                 runtime.Object
+		expectedErr              error
+	}{
+		{
+			name: "local unsigned task with enforce policy",
+			ref: &v1beta1.TaskRef{
+				Name: "test-task",
+			},
+			resourceVerificationMode: config.EnforceResourceVerificationMode,
+			expected:                 nil,
+			expectedErr:              trustedresources.ErrorResourceVerificationFailed,
+		}, {
+			name: "local signed task with enforce policy",
+			ref: &v1beta1.TaskRef{
+				Name: "test-signed",
+			},
+			resourceVerificationMode: config.EnforceResourceVerificationMode,
+			expected:                 signedTask,
+			expectedErr:              nil,
+		}, {
+			name: "local tampered task with enforce policy",
+			ref: &v1beta1.TaskRef{
+				Name: "test-signed2",
+			},
+			resourceVerificationMode: config.EnforceResourceVerificationMode,
+			expected:                 nil,
+			expectedErr:              trustedresources.ErrorResourceVerificationFailed,
+		}, {
+			name: "local unsigned task with warn policy",
+			ref: &v1beta1.TaskRef{
+				Name: "test-task",
+			},
+			resourceVerificationMode: config.WarnResourceVerificationMode,
+			expected:                 unsignedTask,
+			expectedErr:              nil,
+		}, {
+			name: "local signed task with warn policy",
+			ref: &v1beta1.TaskRef{
+				Name: "test-signed",
+			},
+			resourceVerificationMode: config.WarnResourceVerificationMode,
+			expected:                 signedTask,
+			expectedErr:              nil,
+		}, {
+			name: "local tampered task with warn policy",
+			ref: &v1beta1.TaskRef{
+				Name: "test-signed2",
+			},
+			resourceVerificationMode: config.SkipResourceVerificationMode,
+			expected:                 tamperedTask,
+			expectedErr:              nil,
+		}, {
+			name: "local unsigned task with skip policy",
+			ref: &v1beta1.TaskRef{
+				Name: "test-task",
+			},
+			resourceVerificationMode: config.SkipResourceVerificationMode,
+			expected:                 unsignedTask,
+			expectedErr:              nil,
+		}, {
+			name: "local signed task with skip policy",
+			ref: &v1beta1.TaskRef{
+				Name: "test-signed",
+			},
+			resourceVerificationMode: config.SkipResourceVerificationMode,
+			expected:                 signedTask,
+			expectedErr:              nil,
+		}, {
+			name: "local tampered task with skip policy",
+			ref: &v1beta1.TaskRef{
+				Name: "test-signed2",
+			},
+			resourceVerificationMode: config.WarnResourceVerificationMode,
+			expected:                 tamperedTask,
+			expectedErr:              nil,
+		},
+	}
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx = internaltesting.SetupTrustedResourceConfig(ctx, "", tc.resourceVerificationMode)
+			lc := &resources.LocalTaskRefResolver{
+				Namespace:    "trusted-resources",
+				Kind:         tc.ref.Kind,
+				Tektonclient: tektonclient,
+			}
+
+			task, err := lc.GetTask(ctx, tc.ref.Name)
+			if tc.expectedErr != nil && (err == nil || !errors.Is(err, tc.expectedErr)) {
+				t.Fatalf("Expected error %v but found %v instead", tc.expectedErr, err)
+			} else if tc.expectedErr == nil && err != nil {
+				t.Fatalf("Received unexpected error ( %#v )", err)
+			}
+			if d := cmp.Diff(task, tc.expected); d != "" {
+				t.Error(diff.PrintWantGot(d))
+			}
+		})
+	}
+}
+
 func TestGetTaskFunc_RemoteResolution_TrustedResourceVerification(t *testing.T) {
 	ctx := context.Background()
 	signer, secretpath, err := internaltesting.GetSignerFromFile(ctx, t)
@@ -855,6 +1001,7 @@ func TestGetTaskFunc_RemoteResolution_TrustedResourceVerification(t *testing.T) 
 	requesterTampered := test.NewRequester(resolvedTampered, nil)
 
 	taskRef := &v1beta1.TaskRef{ResolverRef: v1beta1.ResolverRef{Resolver: "git"}}
+	tektonclient := fake.NewSimpleClientset()
 
 	testcases := []struct {
 		name                     string
@@ -929,7 +1076,7 @@ func TestGetTaskFunc_RemoteResolution_TrustedResourceVerification(t *testing.T) 
 					ServiceAccountName: "default",
 				},
 			}
-			fn, err := resources.GetTaskFunc(ctx, nil, nil, tc.requester, tr, tr.Spec.TaskRef, "", "default", "default")
+			fn, err := resources.GetTaskFunc(ctx, nil, tektonclient, tc.requester, tr, tr.Spec.TaskRef, "", "default", "default")
 			if err != nil {
 				t.Fatalf("failed to get task fn: %s", err.Error())
 			}
@@ -961,3 +1108,9 @@ spec:
     script: |
       echo "hello world!"
 `
+
+func pass(s string) internaltesting.PassFunc {
+	return func(_ bool) ([]byte, error) {
+		return []byte(s), nil
+	}
+}

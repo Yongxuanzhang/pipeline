@@ -31,7 +31,7 @@ import (
 	resolutioninformer "github.com/tektoncd/pipeline/pkg/client/resolution/injection/informers/resolution/v1beta1/resolutionrequest"
 	resourceinformer "github.com/tektoncd/pipeline/pkg/client/resource/injection/informers/resource/v1alpha1/pipelineresource"
 	"github.com/tektoncd/pipeline/pkg/pipelinerunmetrics"
-	cloudeventclient "github.com/tektoncd/pipeline/pkg/reconciler/events"
+	"github.com/tektoncd/pipeline/pkg/reconciler/events"
 	"github.com/tektoncd/pipeline/pkg/reconciler/volumeclaim"
 	resolution "github.com/tektoncd/pipeline/pkg/resolution/resource"
 	"k8s.io/client-go/tools/cache"
@@ -65,7 +65,7 @@ func NewController(opts *pipeline.Options, clock clock.PassiveClock) func(contex
 			taskRunLister:       taskRunInformer.Lister(),
 			runLister:           runInformer.Lister(),
 			resourceLister:      resourceInformer.Lister(),
-			cloudEventClient:    cloudeventclient.Get(ctx),
+			cloudEventClient:    events.Get(ctx),
 			metrics:             pipelinerunmetrics.Get(ctx),
 			pvcHandler:          volumeclaim.NewPVCHandler(kubeclientset, logger),
 			resolutionRequester: resolution.NewCRDRequester(resolutionclient.Get(ctx), resolutionInformer.Lister()),

@@ -23,7 +23,7 @@ import (
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline"
 	runinformer "github.com/tektoncd/pipeline/pkg/client/injection/informers/pipeline/v1alpha1/run"
 	runreconciler "github.com/tektoncd/pipeline/pkg/client/injection/reconciler/pipeline/v1alpha1/run"
-	cloudeventclient "github.com/tektoncd/pipeline/pkg/reconciler/events"
+	"github.com/tektoncd/pipeline/pkg/reconciler/events"
 	cacheclient "github.com/tektoncd/pipeline/pkg/reconciler/events/cache"
 	"knative.dev/pkg/configmap"
 	"knative.dev/pkg/controller"
@@ -41,7 +41,7 @@ func NewController() func(context.Context, configmap.Watcher) *controller.Impl {
 		configStore.WatchConfigs(cmw)
 
 		c := &Reconciler{
-			cloudEventClient: cloudeventclient.Get(ctx),
+			cloudEventClient: events.Get(ctx),
 			cacheClient:      cacheclient.Get(ctx),
 		}
 		impl := runreconciler.NewImpl(ctx, c, func(impl *controller.Impl) controller.Options {

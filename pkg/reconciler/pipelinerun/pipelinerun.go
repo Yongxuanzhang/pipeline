@@ -44,7 +44,6 @@ import (
 	"github.com/tektoncd/pipeline/pkg/pipelinerunmetrics"
 	tknreconciler "github.com/tektoncd/pipeline/pkg/reconciler"
 	"github.com/tektoncd/pipeline/pkg/reconciler/events"
-	"github.com/tektoncd/pipeline/pkg/reconciler/events/cloudevent"
 	"github.com/tektoncd/pipeline/pkg/reconciler/pipeline/dag"
 	rprp "github.com/tektoncd/pipeline/pkg/reconciler/pipelinerun/pipelinespec"
 	"github.com/tektoncd/pipeline/pkg/reconciler/pipelinerun/resources"
@@ -137,7 +136,7 @@ type Reconciler struct {
 	taskRunLister       listers.TaskRunLister
 	runLister           listersv1alpha1.RunLister
 	resourceLister      resourcelisters.PipelineResourceLister
-	cloudEventClient    cloudevent.CEClient
+	cloudEventClient    events.CEClient
 	metrics             *pipelinerunmetrics.Recorder
 	pvcHandler          volumeclaim.PvcHandler
 	resolutionRequester resolution.Requester
@@ -153,7 +152,7 @@ var (
 // resource with the current status of the resource.
 func (c *Reconciler) ReconcileKind(ctx context.Context, pr *v1beta1.PipelineRun) pkgreconciler.Event {
 	logger := logging.FromContext(ctx)
-	ctx = cloudevent.ToContext(ctx, c.cloudEventClient)
+	ctx = events.ToContext(ctx, c.cloudEventClient)
 
 	// Read the initial condition
 	before := pr.Status.GetCondition(apis.ConditionSucceeded)

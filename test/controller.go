@@ -46,7 +46,7 @@ import (
 	resourceinformersv1alpha1 "github.com/tektoncd/pipeline/pkg/client/resource/informers/externalversions/resource/v1alpha1"
 	fakeresourceclient "github.com/tektoncd/pipeline/pkg/client/resource/injection/client/fake"
 	fakeresourceinformer "github.com/tektoncd/pipeline/pkg/client/resource/injection/informers/resource/v1alpha1/pipelineresource/fake"
-	cloudeventclient "github.com/tektoncd/pipeline/pkg/reconciler/events/cloudevent"
+	"github.com/tektoncd/pipeline/pkg/reconciler/events"
 	"go.uber.org/zap"
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
@@ -90,7 +90,7 @@ type Clients struct {
 	Pipeline           *fakepipelineclientset.Clientset
 	Resource           *fakeresourceclientset.Clientset
 	Kube               *fakekubeclientset.Clientset
-	CloudEvents        cloudeventclient.CEClient
+	CloudEvents        events.CEClient
 	ResolutionRequests *fakeresolutionclientset.Clientset
 }
 
@@ -172,7 +172,7 @@ func SeedTestData(t *testing.T, ctx context.Context, d Data) (Clients, Informers
 		Kube:               fakekubeclient.Get(ctx),
 		Pipeline:           fakepipelineclient.Get(ctx),
 		Resource:           fakeresourceclient.Get(ctx),
-		CloudEvents:        cloudeventclient.Get(ctx),
+		CloudEvents:        events.Get(ctx),
 		ResolutionRequests: fakeresolutionrequestclient.Get(ctx),
 	}
 	// Every time a resource is modified, change the metadata.resourceVersion.

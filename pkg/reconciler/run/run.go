@@ -25,7 +25,6 @@ import (
 	runreconciler "github.com/tektoncd/pipeline/pkg/client/injection/reconciler/pipeline/v1alpha1/run"
 	"github.com/tektoncd/pipeline/pkg/reconciler/events"
 	"github.com/tektoncd/pipeline/pkg/reconciler/events/cache"
-	"github.com/tektoncd/pipeline/pkg/reconciler/events/cloudevent"
 	_ "github.com/tektoncd/pipeline/pkg/taskrunmetrics/fake" // Make sure the taskrunmetrics are setup
 	"knative.dev/pkg/apis"
 	"knative.dev/pkg/logging"
@@ -34,7 +33,7 @@ import (
 
 // Reconciler implements controller.Reconciler for Configuration resources.
 type Reconciler struct {
-	cloudEventClient cloudevent.CEClient
+	cloudEventClient events.CEClient
 	cacheClient      *lru.Cache
 }
 
@@ -49,7 +48,7 @@ var (
 func (c *Reconciler) ReconcileKind(ctx context.Context, run *v1alpha1.Run) pkgreconciler.Event {
 	logger := logging.FromContext(ctx)
 	configs := config.FromContextOrDefaults(ctx)
-	ctx = cloudevent.ToContext(ctx, c.cloudEventClient)
+	ctx = events.ToContext(ctx, c.cloudEventClient)
 	ctx = cache.ToContext(ctx, c.cacheClient)
 	// ctx = cache.ToContext(ctx, c.cacheClient)
 	logger.Infof("Reconciling %s", run.Name)

@@ -30,10 +30,9 @@ import (
 	"github.com/tektoncd/pipeline/pkg/apis/config"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1alpha1"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
-	"github.com/tektoncd/pipeline/pkg/reconciler/events/cloudevent"
+	"github.com/tektoncd/pipeline/pkg/reconciler/events"
 	ttesting "github.com/tektoncd/pipeline/pkg/reconciler/testing"
 	"github.com/tektoncd/pipeline/test"
-	eventstest "github.com/tektoncd/pipeline/test/events"
 	"github.com/tektoncd/pipeline/test/names"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -189,8 +188,8 @@ func TestReconcile_CloudEvents(t *testing.T) {
 				t.Fatalf("run should not have changed, go %v instead", d)
 			}
 
-			ceClient := clients.CloudEvents.(cloudevent.FakeClient)
-			err = eventstest.CheckEventsUnordered(t, ceClient.Events, tc.name, tc.wantCloudEvents)
+			ceClient := clients.CloudEvents.(events.FakeClient)
+			err = events.CheckEventsUnordered(t, ceClient.Events, tc.name, tc.wantCloudEvents)
 			if err != nil {
 				t.Errorf(err.Error())
 			}
@@ -199,7 +198,7 @@ func TestReconcile_CloudEvents(t *testing.T) {
 			if err := c.Reconciler.Reconcile(testAssets.Ctx, getRunName(run)); err != nil {
 				t.Fatal("Didn't expect an error, but got one.")
 			}
-			err = eventstest.CheckEventsUnordered(t, ceClient.Events, tc.name, []string{})
+			err = events.CheckEventsUnordered(t, ceClient.Events, tc.name, []string{})
 			if err != nil {
 				t.Errorf(err.Error())
 			}
@@ -298,8 +297,8 @@ func TestReconcile_CloudEvents_Disabled(t *testing.T) {
 				t.Fatalf("run should not have changed, go %v instead", d)
 			}
 
-			ceClient := clients.CloudEvents.(cloudevent.FakeClient)
-			err = eventstest.CheckEventsUnordered(t, ceClient.Events, tc.name, []string{})
+			ceClient := clients.CloudEvents.(events.FakeClient)
+			err = events.CheckEventsUnordered(t, ceClient.Events, tc.name, []string{})
 			if err != nil {
 				t.Errorf(err.Error())
 			}

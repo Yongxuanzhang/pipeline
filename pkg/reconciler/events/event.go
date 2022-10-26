@@ -21,7 +21,6 @@ import (
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
 	"github.com/tektoncd/pipeline/pkg/apis/config"
-	"github.com/tektoncd/pipeline/pkg/reconciler/events/cloudevent"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -61,7 +60,7 @@ func Emit(ctx context.Context, beforeCondition *apis.Condition, afterCondition *
 	if sendCloudEvents {
 		// Only send events if the new condition represents a change
 		if !equality.Semantic.DeepEqual(beforeCondition, afterCondition) {
-			err := cloudevent.SendCloudEventWithRetries(ctx, object)
+			err := SendCloudEventWithRetries(ctx, object)
 			if err != nil {
 				logger.Warnf("Failed to emit cloud events %v", err.Error())
 			}
@@ -79,7 +78,7 @@ func EmitCloudEvents(ctx context.Context, object runtime.Object) {
 	}
 
 	if sendCloudEvents {
-		err := cloudevent.SendCloudEventWithRetries(ctx, object)
+		err := SendCloudEventWithRetries(ctx, object)
 		if err != nil {
 			logger.Warnf("Failed to emit cloud events %v", err.Error())
 		}

@@ -11,7 +11,7 @@ import (
 	"knative.dev/pkg/injection"
 	logtesting "knative.dev/pkg/logging/testing"
 
-	"github.com/tektoncd/pipeline/pkg/reconciler/events/cloudevent"
+	"github.com/tektoncd/pipeline/pkg/reconciler/events"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest"
 	"knative.dev/pkg/controller"
@@ -24,10 +24,10 @@ import (
 // SetupFakeContext sets up the Context and the fake filtered informers for the tests.
 func SetupFakeContext(t *testing.T) (context.Context, []controller.Informer) {
 	ctx, _, informer := setupFakeContextWithLabelKey(t)
-	cloudEventClientBehaviour := cloudevent.FakeClientBehaviour{
+	cloudEventClientBehaviour := events.FakeClientBehaviour{
 		SendSuccessfully: true,
 	}
-	ctx = cloudevent.WithClient(ctx, &cloudEventClientBehaviour)
+	ctx = events.WithClient(ctx, &cloudEventClientBehaviour)
 	return WithLogger(ctx, t), informer
 }
 

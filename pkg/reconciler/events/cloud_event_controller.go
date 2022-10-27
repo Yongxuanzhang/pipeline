@@ -144,9 +144,14 @@ func(e *EventSender) SendCloudEventWithRetries(ctx context.Context, object runti
 	_, isRun := object.(*v1alpha1.Run)
 
 	wasIn := make(chan error)
-	e.WaitGroup.Add(1)
+	if e.WaitGroup!=nil{
+		e.WaitGroup.Add(1)
+	}
+
 	go func() {
+		if e.WaitGroup!=nil{
 		defer e.WaitGroup.Done()
+	}
 		wasIn <- nil
 		logger.Debugf("Sending cloudevent of type %q", event.Type())
 		// In case of Run event, check cache if cloudevent is already sent

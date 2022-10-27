@@ -116,6 +116,7 @@ type Assets struct {
 	Controller *controller.Impl
 	Clients    Clients
 	Informers  Informers
+	EventSender events.EventSender
 	Recorder   *record.FakeRecorder
 	Ctx        context.Context
 }

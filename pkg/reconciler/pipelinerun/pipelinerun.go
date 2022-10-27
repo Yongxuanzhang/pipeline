@@ -130,6 +130,7 @@ type Reconciler struct {
 	PipelineClientSet clientset.Interface
 	Images            pipeline.Images
 	Clock             clock.PassiveClock
+	EventSender       events.EventSender
 
 	// listers index properties about resources
 	pipelineRunLister   listers.PipelineRunLister
@@ -171,7 +172,7 @@ func (c *Reconciler) ReconcileKind(ctx context.Context, pr *v1beta1.PipelineRun)
 		// We also want to send the "Started" event as soon as possible for anyone who may be waiting
 		// on the event to perform user facing initialisations, such has reset a CI check status
 		afterCondition := pr.Status.GetCondition(apis.ConditionSucceeded)
-		events.Emit(ctx, nil, afterCondition, pr)
+		c.EventSender.Emit(ctx, nil, afterCondition, pr)
 
 		// We already sent an event for start, so update `before` with the current status
 		before = pr.Status.GetCondition(apis.ConditionSucceeded)
@@ -281,7 +282,7 @@ func (c *Reconciler) finishReconcileUpdateEmitEvents(ctx context.Context, pr *v1
 	logger := logging.FromContext(ctx)
 
 	afterCondition := pr.Status.GetCondition(apis.ConditionSucceeded)
-	events.Emit(ctx, beforeCondition, afterCondition, pr)
+	c.EventSender.Emit(ctx, beforeCondition, afterCondition, pr)
 	_, err := c.updateLabelsAndAnnotations(ctx, pr)
 	if err != nil {
 		logger.Warn("Failed to update PipelineRun labels/annotations", zap.Error(err))

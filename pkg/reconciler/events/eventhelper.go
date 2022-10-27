@@ -24,8 +24,11 @@ import (
 
 // CheckEventsOrdered checks that the events received via the given chan are the same as wantEvents,
 // in the same order.
-func CheckEventsOrdered(t *testing.T, eventChan chan string, testName string, wantEvents []string) error {
+func(e *EventSender) CheckEventsOrdered(t *testing.T, eventChan chan string, testName string, wantEvents []string) error {
 	t.Helper()
+	if e.WaitGroup!=nil{
+		e.WaitGroup.Wait()
+	}
 	// Sleep 50ms to make sure events have delivered
 	time.Sleep(50 * time.Millisecond)
 	err := eventsFromChannel(eventChan, wantEvents)
@@ -37,8 +40,11 @@ func CheckEventsOrdered(t *testing.T, eventChan chan string, testName string, wa
 
 // CheckEventsUnordered checks that all events in wantEvents, and no others,
 // were received via the given chan, in any order.
-func CheckEventsUnordered(t *testing.T, eventChan chan string, testName string, wantEvents []string) error {
+func(e *EventSender) CheckEventsUnordered(t *testing.T, eventChan chan string, testName string, wantEvents []string) error {
 	t.Helper()
+	if e.WaitGroup!=nil{
+		e.WaitGroup.Wait()
+	}
 	// Sleep 50ms to make sure events have delivered
 	time.Sleep(50 * time.Millisecond)
 	err := eventsFromChannelUnordered(eventChan, wantEvents)

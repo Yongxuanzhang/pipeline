@@ -32,7 +32,7 @@ import (
 
 // NewController instantiates a new controller.Impl from knative.dev/pkg/controller
 // This is a read-only controller, hence the SkipStatusUpdates set to true
-func NewController() func(context.Context, configmap.Watcher) *controller.Impl {
+func NewController(e events.EventSender) func(context.Context, configmap.Watcher) *controller.Impl {
 	return func(ctx context.Context, cmw configmap.Watcher) *controller.Impl {
 		logger := logging.FromContext(ctx)
 		runInformer := runinformer.Get(ctx)
@@ -43,6 +43,7 @@ func NewController() func(context.Context, configmap.Watcher) *controller.Impl {
 		c := &Reconciler{
 			cloudEventClient: events.Get(ctx),
 			cacheClient:      cacheclient.Get(ctx),
+			eventSender:      e,
 		}
 		impl := runreconciler.NewImpl(ctx, c, func(impl *controller.Impl) controller.Options {
 			return controller.Options{

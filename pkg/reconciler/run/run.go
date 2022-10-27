@@ -34,6 +34,7 @@ import (
 // Reconciler implements controller.Reconciler for Configuration resources.
 type Reconciler struct {
 	cloudEventClient events.CEClient
+	eventSender       events.EventSender
 	cacheClient      *lru.Cache
 }
 
@@ -65,7 +66,7 @@ func (c *Reconciler) ReconcileKind(ctx context.Context, run *v1alpha1.Run) pkgre
 		condition := runEvents.Status.GetCondition(apis.ConditionSucceeded)
 		logger.Debugf("Emitting cloudevent for %s, condition: %s", runEvents.Name, condition)
 
-		events.EmitCloudEvents(ctx, &runEvents)
+		c.eventSender.EmitCloudEvents(ctx, &runEvents)
 	}
 
 	return nil

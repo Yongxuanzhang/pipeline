@@ -18,6 +18,7 @@ package events
 
 import (
 	"context"
+	"sync"
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
 	"github.com/tektoncd/pipeline/pkg/apis/config"
@@ -41,12 +42,16 @@ const (
 	EventReasonError = "Error"
 )
 
+type EventSender struct{
+   WaitGroup *sync.WaitGroup
+}
+
 // Emit emits events for object
 // Two types of events are supported, k8s and cloud events.
 //
 // k8s events are always sent if afterCondition is different from beforeCondition
 // Cloud events are always sent if enabled, i.e. if a sink is available
-func Emit(ctx context.Context, beforeCondition *apis.Condition, afterCondition *apis.Condition, object runtime.Object) {
+func(e *EventSender) Emit(ctx context.Context, beforeCondition *apis.Condition, afterCondition *apis.Condition, object runtime.Object) {
 	recorder := controller.GetEventRecorder(ctx)
 	logger := logging.FromContext(ctx)
 	configs := config.FromContextOrDefaults(ctx)
@@ -60,7 +65,7 @@ func Emit(ctx context.Context, beforeCondition *apis.Condition, afterCondition *
 	if sendCloudEvents {
 		// Only send events if the new condition represents a change
 		if !equality.Semantic.DeepEqual(beforeCondition, afterCondition) {
-			err := SendCloudEventWithRetries(ctx, object)
+			err := e.SendCloudEventWithRetries(ctx, object)
 			if err != nil {
 				logger.Warnf("Failed to emit cloud events %v", err.Error())
 			}
@@ -69,7 +74,7 @@ func Emit(ctx context.Context, beforeCondition *apis.Condition, afterCondition *
 }
 
 // EmitCloudEvents emits CloudEvents (only) for object
-func EmitCloudEvents(ctx context.Context, object runtime.Object) {
+func(e *EventSender) EmitCloudEvents(ctx context.Context, object runtime.Object) {
 	logger := logging.FromContext(ctx)
 	configs := config.FromContextOrDefaults(ctx)
 	sendCloudEvents := (configs.Defaults.DefaultCloudEventsSink != "")
@@ -78,7 +83,7 @@ func EmitCloudEvents(ctx context.Context, object runtime.Object) {
 	}
 
 	if sendCloudEvents {
-		err := SendCloudEventWithRetries(ctx, object)
+		err := e.SendCloudEventWithRetries(ctx, object)
 		if err != nil {
 			logger.Warnf("Failed to emit cloud events %v", err.Error())
 		}

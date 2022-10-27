@@ -25,6 +25,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
@@ -136,7 +137,8 @@ func initializePipelineRunControllerAssets(t *testing.T, d test.Data, opts pipel
 	test.EnsureConfigurationConfigMapsExist(&d)
 	c, informers := test.SeedTestData(t, ctx, d)
 	configMapWatcher := cminformer.NewInformedWatcher(c.Kube, system.Namespace())
-	ctl := NewController(&opts, testClock)(ctx, configMapWatcher)
+	e:=events.EventSender{WaitGroup: &sync.WaitGroup{}}
+	ctl := NewController(&opts, testClock, e)(ctx, configMapWatcher)
 	if la, ok := ctl.Reconciler.(reconciler.LeaderAware); ok {
 		if err := la.Promote(reconciler.UniversalBucket(), func(reconciler.Bucket, types.NamespacedName) {}); err != nil {
 			t.Fatalf("error promoting reconciler leader: %v", err)
@@ -149,6 +151,7 @@ func initializePipelineRunControllerAssets(t *testing.T, d test.Data, opts pipel
 		Logger:     logging.FromContext(ctx),
 		Clients:    c,
 		Controller: ctl,
+		EventSender: e,
 		Informers:  informers,
 		Recorder:   controller.GetEventRecorder(ctx).(*record.FakeRecorder),
 		Ctx:        ctx,
@@ -2949,7 +2952,7 @@ spec:
 				"Normal PipelineRunCouldntCancel PipelineRun \"test-pipeline-fails-to-cancel\" was cancelled but had errors trying to cancel TaskRuns",
 				"Warning InternalError 1 error occurred",
 			}
-			err = events.CheckEventsOrdered(t, testAssets.Recorder.Events, prName, wantEvents)
+			err = testAssets.EventSender.CheckEventsOrdered(t, testAssets.Recorder.Events, prName, wantEvents)
 			if err != nil {
 				t.Errorf(err.Error())
 			}
@@ -3065,7 +3068,7 @@ spec:
 		"Normal PipelineRunCouldntTimeOut PipelineRun \"test-pipeline-fails-to-timeout\" was timed out but had errors trying to time out TaskRuns and/or Runs",
 		"Warning InternalError 1 error occurred",
 	}
-	err = events.CheckEventsOrdered(t, testAssets.Recorder.Events, prName, wantEvents)
+	err = testAssets.EventSender.CheckEventsOrdered(t, testAssets.Recorder.Events, prName, wantEvents)
 	if err != nil {
 		t.Errorf(err.Error())
 	}
@@ -6542,7 +6545,7 @@ spec:
 		`(?s)dev.tekton.event.pipelinerun.running.v1.*test-pipelinerun`,
 	}
 	ceClient := clients.CloudEvents.(events.FakeClient)
-	if err := events.CheckEventsUnordered(t, ceClient.Events, "reconcile-cloud-events", wantCloudEvents); err != nil {
+	if err := prt.TestAssets.EventSender.CheckEventsUnordered(t, ceClient.Events, "reconcile-cloud-events", wantCloudEvents); err != nil {
 		t.Errorf(err.Error())
 	}
 }
@@ -7020,7 +7023,7 @@ func (prt PipelineRunTest) reconcileRun(namespace, pipelineRunName string, wantE
 
 	// Check generated events match what's expected
 	if len(wantEvents) > 0 {
-		if err := events.CheckEventsOrdered(prt.Test, prt.TestAssets.Recorder.Events, pipelineRunName, wantEvents); err != nil {
+		if err := prt.TestAssets.EventSender.CheckEventsOrdered(prt.Test, prt.TestAssets.Recorder.Events, pipelineRunName, wantEvents); err != nil {
 			prt.Test.Errorf(err.Error())
 		}
 	}

@@ -71,6 +71,7 @@ type Reconciler struct {
 	PipelineClientSet clientset.Interface
 	Images            pipeline.Images
 	Clock             clock.PassiveClock
+	eventSender       events.EventSender
 
 	// listers index properties about resources
 	taskRunLister       listers.TaskRunLister
@@ -117,7 +118,7 @@ func (c *Reconciler) ReconcileKind(ctx context.Context, tr *v1beta1.TaskRun) pkg
 		// We also want to send the "Started" event as soon as possible for anyone who may be waiting
 		// on the event to perform user facing initialisations, such has reset a CI check status
 		afterCondition := tr.Status.GetCondition(apis.ConditionSucceeded)
-		events.Emit(ctx, nil, afterCondition, tr)
+		c.eventSender.Emit(ctx, nil, afterCondition, tr)
 	}
 
 	// If the TaskRun is complete, run some post run fixtures when applicable
@@ -292,7 +293,7 @@ func (c *Reconciler) finishReconcileUpdateEmitEvents(ctx context.Context, tr *v1
 	afterCondition := tr.Status.GetCondition(apis.ConditionSucceeded)
 
 	// Send k8s events and cloud events (when configured)
-	events.Emit(ctx, beforeCondition, afterCondition, tr)
+	c.eventSender.Emit(ctx, beforeCondition, afterCondition, tr)
 
 	_, err := c.updateLabelsAndAnnotations(ctx, tr)
 	if err != nil {

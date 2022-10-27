@@ -18,6 +18,7 @@ package events
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
@@ -606,15 +607,16 @@ func TestSendCloudEventWithRetries(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := setupFakeContext(t, tc.clientBehaviour, true)
-			if err := SendCloudEventWithRetries(ctx, tc.object); err != nil {
+			e := EventSender{WaitGroup: &sync.WaitGroup{}}
+			if err := e.SendCloudEventWithRetries(ctx, tc.object); err != nil {
 				t.Fatalf("Unexpected error sending cloud events: %v", err)
 			}
 			ceClient := Get(ctx).(FakeClient)
-			if err := CheckEventsUnordered(t, ceClient.Events, tc.name, tc.wantCEvents); err != nil {
+			if err := e.CheckEventsUnordered(t, ceClient.Events, tc.name, tc.wantCEvents); err != nil {
 				t.Fatalf(err.Error())
 			}
 			recorder := controller.GetEventRecorder(ctx).(*record.FakeRecorder)
-			if err := CheckEventsOrdered(t, recorder.Events, tc.name, tc.wantEvents); err != nil {
+			if err := e.CheckEventsOrdered(t, recorder.Events, tc.name, tc.wantEvents); err != nil {
 				t.Fatalf(err.Error())
 			}
 		})
@@ -650,7 +652,8 @@ func TestSendCloudEventWithRetriesInvalid(t *testing.T) {
 			}, true)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
-			err := SendCloudEventWithRetries(ctx, tc.object)
+			e := EventSender{WaitGroup: &sync.WaitGroup{}}
+			err := e.SendCloudEventWithRetries(ctx, tc.object)
 			if err == nil {
 				t.Fatalf("Expected an error sending cloud events for invalid object, got none")
 			}
@@ -661,7 +664,8 @@ func TestSendCloudEventWithRetriesInvalid(t *testing.T) {
 func TestSendCloudEventWithRetriesNoClient(t *testing.T) {
 
 	ctx := setupFakeContext(t, FakeClientBehaviour{}, false)
-	err := SendCloudEventWithRetries(ctx, &v1beta1.TaskRun{Status: v1beta1.TaskRunStatus{}})
+	e := EventSender{WaitGroup: &sync.WaitGroup{}}
+	err := e.SendCloudEventWithRetries(ctx, &v1beta1.TaskRun{Status: v1beta1.TaskRunStatus{}})
 	if err == nil {
 		t.Fatalf("Expected an error sending cloud events with no client in the context, got none")
 	}

@@ -19,6 +19,7 @@ package run
 import (
 	"context"
 	"strings"
+	"sync"
 	"testing"
 
 	duckv1 "knative.dev/pkg/apis/duck/v1"
@@ -53,7 +54,8 @@ func initializeRunControllerAssets(t *testing.T, d test.Data) (test.Assets, func
 	test.EnsureConfigurationConfigMapsExist(&d)
 	c, informers := test.SeedTestData(t, ctx, d)
 	configMapWatcher := cminformer.NewInformedWatcher(c.Kube, system.Namespace())
-	ctl := NewController()(ctx, configMapWatcher)
+	e:=events.EventSender{WaitGroup: &sync.WaitGroup{}}
+	ctl := NewController(e)(ctx, configMapWatcher)
 	if err := configMapWatcher.Start(ctx.Done()); err != nil {
 		t.Fatalf("error starting configmap watcher: %v", err)
 	}
@@ -66,6 +68,7 @@ func initializeRunControllerAssets(t *testing.T, d test.Data) (test.Assets, func
 		Logger:     logging.FromContext(ctx),
 		Controller: ctl,
 		Clients:    c,
+		EventSender: e,
 		Informers:  informers,
 		Recorder:   controller.GetEventRecorder(ctx).(*record.FakeRecorder),
 		Ctx:        ctx,
@@ -189,7 +192,7 @@ func TestReconcile_CloudEvents(t *testing.T) {
 			}
 
 			ceClient := clients.CloudEvents.(events.FakeClient)
-			err = events.CheckEventsUnordered(t, ceClient.Events, tc.name, tc.wantCloudEvents)
+			err = testAssets.EventSender.CheckEventsUnordered(t, ceClient.Events, tc.name, tc.wantCloudEvents)
 			if err != nil {
 				t.Errorf(err.Error())
 			}
@@ -198,7 +201,7 @@ func TestReconcile_CloudEvents(t *testing.T) {
 			if err := c.Reconciler.Reconcile(testAssets.Ctx, getRunName(run)); err != nil {
 				t.Fatal("Didn't expect an error, but got one.")
 			}
-			err = events.CheckEventsUnordered(t, ceClient.Events, tc.name, []string{})
+			err = testAssets.EventSender.CheckEventsUnordered(t, ceClient.Events, tc.name, []string{})
 			if err != nil {
 				t.Errorf(err.Error())
 			}
@@ -298,7 +301,7 @@ func TestReconcile_CloudEvents_Disabled(t *testing.T) {
 			}
 
 			ceClient := clients.CloudEvents.(events.FakeClient)
-			err = events.CheckEventsUnordered(t, ceClient.Events, tc.name, []string{})
+			err = testAssets.EventSender.CheckEventsUnordered(t, ceClient.Events, tc.name, []string{})
 			if err != nil {
 				t.Errorf(err.Error())
 			}

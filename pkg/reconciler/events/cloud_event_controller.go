@@ -122,7 +122,7 @@ func SendCloudEvents(tr *v1beta1.TaskRun, ceclient CEClient, logger *zap.Sugared
 // sdk-go capabilities.
 // It accepts a runtime.Object to avoid making objectWithCondition public since
 // it's only used within the events/cloudevents packages.
-func SendCloudEventWithRetries(ctx context.Context, object runtime.Object) error {
+func(e *EventSender) SendCloudEventWithRetries(ctx context.Context, object runtime.Object) error {
 	var (
 		o  objectWithCondition
 		ok bool
@@ -144,7 +144,9 @@ func SendCloudEventWithRetries(ctx context.Context, object runtime.Object) error
 	_, isRun := object.(*v1alpha1.Run)
 
 	wasIn := make(chan error)
+	e.WaitGroup.Add(1)
 	go func() {
+		defer e.WaitGroup.Done()
 		wasIn <- nil
 		logger.Debugf("Sending cloudevent of type %q", event.Type())
 		// In case of Run event, check cache if cloudevent is already sent

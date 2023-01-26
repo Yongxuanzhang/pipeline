@@ -137,7 +137,7 @@ func TestEmitK8sEventsOnConditions(t *testing.T) {
 	for _, ts := range testcases {
 		tr := &corev1.Pod{}
 		ctx, _ := SetupFakeContext(t)
-		recorder := controller.GetEventRecorder(ctx).(*FakeRecorder)
+		recorder := GetEventRecorder(ctx).(*FakeRecorder)
 		EmitK8sEvents(ctx, ts.before, ts.after, tr)
 		err := recorder.CheckEventsOrdered(t, recorder.Events, ts.name, ts.wantEvents)
 		if err != nil {

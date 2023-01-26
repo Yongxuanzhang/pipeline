@@ -31,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
 	"knative.dev/pkg/apis"
-	"knative.dev/pkg/controller"
 	"knative.dev/pkg/logging"
 )
 
@@ -102,16 +101,13 @@ func SendCloudEventWithRetries(ctx context.Context, object runtime.Object) error
 	wasIn := make(chan error)
 
 	ceClient.addCount()
-	recorder := controller.GetEventRecorder(ctx)
-	r, isFakerecorder := recorder.(*k8sevent.FakeRecorder)
-	if isFakerecorder {
-		r.AddCount()
-	}
+	recorder := k8sevent.GetEventRecorder(ctx)
+	recorder.AddCount()
+
 	go func() {
 		defer ceClient.decreaseCount()
-		if isFakerecorder{
-			defer r.DecreaseCount()
-		}
+		defer recorder.DecreaseCount()
+
 		wasIn <- nil
 		logger.Debugf("Sending cloudevent of type %q", event.Type())
 		// In case of Run event, check cache if cloudevent is already sent
@@ -131,11 +127,7 @@ func SendCloudEventWithRetries(ctx context.Context, object runtime.Object) error
 				logger.Warnf("No recorder in context, cannot emit error event")
 				return
 			}
-			if isFakerecorder{
-				r.Event(object, corev1.EventTypeWarning, "Cloud Event Failure", result.Error())
-			}else{
-				recorder.Event(object, corev1.EventTypeWarning, "Cloud Event Failure", result.Error())
-			}
+			recorder.Event(object, corev1.EventTypeWarning, "Cloud Event Failure", result.Error())
 		}
 	}()
 

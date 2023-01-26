@@ -72,7 +72,7 @@ func SetupFakeContext(t testing.TB, fs ...func(context.Context) context.Context)
 // The optional fs() can be used to edit ctx before the SetupInformer steps
 func SetupFakeContextWithCancel(t testing.TB, fs ...func(context.Context) context.Context) (context.Context, context.CancelFunc, []controller.Informer) {
 	ctx, c := context.WithCancel(logtesting.TestContextWithLogger(t))
-	ctx = controller.WithEventRecorder(ctx, NewFakeRecorder(1000))
+	ctx = WithEventRecorder(ctx, NewFakeRecorder(1000))
 	for _, f := range fs {
 		ctx = f(ctx)
 	}

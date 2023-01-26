@@ -24,7 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	"knative.dev/pkg/apis"
-	"knative.dev/pkg/controller"
+	"knative.dev/pkg/logging"
 )
 
 const (
@@ -41,7 +41,7 @@ const (
 // EmitK8sEvents emits kubernetes events for object
 // k8s events are always sent if afterCondition is different from beforeCondition
 func EmitK8sEvents(ctx context.Context, beforeCondition *apis.Condition, afterCondition *apis.Condition, object runtime.Object) {
-	recorder := controller.GetEventRecorder(ctx)
+	recorder := GetEventRecorder(ctx)
 	// Events that are going to be sent
 	//
 	// Status "ConditionUnknown":
@@ -79,7 +79,7 @@ func EmitError(c record.EventRecorder, err error, object runtime.Object) {
 	}
 }
 
-/*
+
 // EventRecorder wraps the `Client` interface from github.com/cloudevents/sdk-go/v2/cloudevents
 // and has methods to count the cloud events being sent, those methods are for testing purposes.
 type Recorder interface {
@@ -131,8 +131,10 @@ func WithEventRecorder(ctx context.Context, er record.EventRecorder) context.Con
 func GetEventRecorder(ctx context.Context) Recorder {
 	untyped := ctx.Value(erKey{})
 	if untyped == nil {
+		logging.FromContext(ctx).Errorf(
+			"Unable to fetch recorder from context.")
 		return nil
 	}
 	return untyped.(Recorder)
 }
-*/
+

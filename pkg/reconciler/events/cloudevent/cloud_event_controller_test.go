@@ -31,7 +31,6 @@ import (
 	"knative.dev/pkg/apis"
 	duckv1 "knative.dev/pkg/apis/duck/v1"
 	"knative.dev/pkg/controller"
-	rtesting "knative.dev/pkg/reconciler/testing"
 )
 
 func TestSendCloudEventWithRetries(t *testing.T) {
@@ -109,7 +108,7 @@ func TestSendCloudEventWithRetries(t *testing.T) {
 			}
 			ceClient := Get(ctx).(FakeClient)
 			ceClient.CheckCloudEventsUnordered(t, tc.name, tc.wantCEvents)
-			recorder := controller.GetEventRecorder(ctx).(*k8sevent.FakeRecorder)
+			recorder := k8sevent.GetEventRecorder(ctx).(*k8sevent.FakeRecorder)
 			if err := recorder.CheckEventsOrdered(t, recorder.Events, tc.name, tc.wantEvents); err != nil {
 				t.Fatalf(err.Error())
 			}
@@ -260,7 +259,7 @@ func TestEmitCloudEventsWhenConditionChange(t *testing.T) {
 
 func setupFakeContext(t *testing.T, behaviour FakeClientBehaviour, withClient bool, expectedEventCount int) context.Context {
 	t.Helper()
-	ctx, _ := rtesting.SetupFakeContext(t)
+	ctx, _ := k8sevent.SetupFakeContext(t)
 	if withClient {
 		ctx = WithClient(ctx, &behaviour, expectedEventCount)
 	}

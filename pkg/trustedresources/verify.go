@@ -31,6 +31,7 @@ import (
 	"github.com/tektoncd/pipeline/pkg/trustedresources/verifier"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	"knative.dev/pkg/logging"
 )
 
 const (
@@ -125,8 +126,16 @@ func verifyResource(ctx context.Context, resource metav1.Object, k8s kubernetes.
 			}
 		}
 		// if this policy fails the verification, should return error directly. No need to check other policies
-		if !passVerification {
-			return fmt.Errorf("%w: resource %s in namespace %s fails verification", ErrResourceVerificationFailed, resource.GetName(), resource.GetNamespace())
+		if !passVerification{
+			switch p.Spec.Mode{
+			case v1alpha1.ModeEnforce:
+				return fmt.Errorf("%w: resource %s in namespace %s fails verification", ErrResourceVerificationFailed, resource.GetName(), resource.GetNamespace())
+			case v1alpha1.ModeWarn:
+				logger := logging.FromContext(ctx)
+				logger.Warnf("%w: resource %s in namespace %s fails verification", ErrResourceVerificationFailed, resource.GetName(), resource.GetNamespace())
+			default:
+				return fmt.Errorf("%w: resource %s in namespace %s fails verification", ErrResourceVerificationFailed, resource.GetName(), resource.GetNamespace())
+			}
 		}
 	}
 	return nil

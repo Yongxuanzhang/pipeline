@@ -78,7 +78,7 @@ How does VerificationPolicy work?
 You can create multiple `VerificationPolicy` and apply them to the cluster.
 1. Trusted resources will look up policies from the resource namespace (usually this is the same as taskrun/pipelinerun namespace).
 2. If multiple policies are found. For each policy we will check if the resource url is matching any of the `patterns` in the `resources` list. If matched then this policy will be used for verification.
-3. If multiple policies are matched, the resource needs to pass all of them to pass verification.
+3. If multiple policies are matched, the resource needs to pass all of the "enforce" mode policies. If only matching "warn" mode policies, fail to pass the "warn" policy will not fail the taskrun/pipelinerun but only log a warning.
 4. To pass one policy, the resource can pass any public keys in the policy.
 
 Take the following `VerificationPolicies` for example, a resource from "https://github.com/tektoncd/catalog.git", needs to pass both `verification-policy-a` and `verification-policy-b`, to pass `verification-policy-a` the resource needs to pass either `key1` or `key2`.
@@ -109,6 +109,8 @@ spec:
       key:
         # data stores the inline public key data
         data: "STRING_ENCODED_PUBLIC_KEY"
+  # mode can be set to "enforce" or "warn".
+  mode: enforce
 ```
 
 ```yaml
@@ -141,6 +143,9 @@ To learn more about `ConfigSource` please refer to resolvers doc for more contex
 
 `hashAlgorithm` is the algorithm for the public key, by default is `sha256`. It also supports `SHA224`, `SHA384`, `SHA512`.
 
+`mode` controls whether a failing policy will fail the taskrun/pipelinerun, or only log the a warning
+ * enforce (default) - fail the taskrun/pipelinerun if verification fails
+ * warn - don't fail the taskrun/pipelinerun if verification fails but log a warning
 
 #### Migrate Config key at configmap to VerificationPolicy
 **Note:** key configuration in configmap is deprecated,

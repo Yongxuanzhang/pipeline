@@ -135,7 +135,8 @@ func getMatchedPolicies(resourceName string, source string, policies []*v1alpha1
 
 // verifyResource verifies resource which implements metav1.Object by provided signature and public keys from verification policies.
 // For matched policies, `verifyResource“ will adopt the following rules to do verification:
-// 1. If multiple policies are matched, the resource needs to pass all of them to pass verification. We use AND logic on matched policies.
+// 1. If multiple policies are matched, the resource needs to pass all of "enforced" mode policies to pass verification. We use AND logic on matched "enforce" policies.
+//    or the resource only matches "warn" mode policies.
 // 2. To pass one policy, the resource can pass any public keys in the policy. We use OR logic on public keys of one policy.
 func verifyResource(ctx context.Context, resource metav1.Object, k8s kubernetes.Interface, signature []byte, matchedPolicies []*v1alpha1.VerificationPolicy) error {
 	for _, p := range matchedPolicies {
@@ -151,9 +152,15 @@ func verifyResource(ctx context.Context, resource metav1.Object, k8s kubernetes.
 				break
 			}
 		}
-		// if this policy fails the verification, should return error directly. No need to check other policies
+		// if this policy fails the verification and the mode is not "warn", should return error directly. No need to check other policies
 		if !passVerification {
-			return fmt.Errorf("%w: resource %s in namespace %s fails verification", ErrResourceVerificationFailed, resource.GetName(), resource.GetNamespace())
+			if p.Spec.Mode == v1alpha1.ModeWarn {
+				logger := logging.FromContext(ctx)
+				logger.Warnf("%w: resource %s in namespace %s fails verification", ErrResourceVerificationFailed, resource.GetName(), resource.GetNamespace())
+			} else {
+				// if the mode is "enforce" or not set, return error.
+				return fmt.Errorf("%w: resource %s in namespace %s fails verification", ErrResourceVerificationFailed, resource.GetName(), resource.GetNamespace())
+			}
 		}
 	}
 	return nil
@@ -207,7 +214,7 @@ func prepareObjectMeta(in metav1.ObjectMeta) (metav1.ObjectMeta, []byte, error) 
 	// signature should be contained in annotation
 	sig, ok := in.Annotations[SignatureAnnotation]
 	if !ok {
-		return out, nil, ErrSignatureMissing
+		return out, []byte{}, nil
 	}
 	// extract signature
 	signature, err := base64.StdEncoding.DecodeString(sig)

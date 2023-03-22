@@ -31,14 +31,18 @@ import (
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1alpha1"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	"github.com/tektoncd/pipeline/pkg/trustedresources/verifier"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	"knative.dev/pkg/apis"
 	"knative.dev/pkg/logging"
 )
 
 const (
 	// SignatureAnnotation is the key of signature in annotation map
 	SignatureAnnotation = "tekton.dev/signature"
+	// ConditionTrustedResourcesVerified specifies that the resources pass trusted resources verification or not.
+	ConditionTrustedResourcesVerified apis.ConditionType = "TrustedResourcesVerified"
 )
 
 // VerifyTask verifies the signature and public key against task.
@@ -82,7 +86,7 @@ func VerifyTask(ctx context.Context, taskObj v1beta1.TaskObject, k8s kubernetes.
 // Return an error when no policies are found and trusted-resources-verification-no-match-policy is set to fail,
 // or the resource fails to pass matched enforce verification policy
 // source is from ConfigSource.URI, which will be used to match policy patterns. k8s is used to fetch secret from cluster
-func VerifyPipeline(ctx context.Context, pipelineObj v1beta1.PipelineObject, k8s kubernetes.Interface, source string, verificationpolicies []*v1alpha1.VerificationPolicy) error {
+func VerifyPipeline(ctx context.Context, pipelineObj v1beta1.PipelineObject, k8s kubernetes.Interface, source string, verificationpolicies []*v1alpha1.VerificationPolicy, pipelineRunStatus *v1beta1.PipelineRunStatus) error {
 	matchedPolicies, err := getMatchedPolicies(pipelineObj.PipelineMetadata().Name, source, verificationpolicies)
 	if err != nil {
 		if errors.Is(err, ErrNoMatchedPolicies) {
@@ -92,9 +96,21 @@ func VerifyPipeline(ctx context.Context, pipelineObj v1beta1.PipelineObject, k8s
 			case config.WarnNoMatchPolicy:
 				logger := logging.FromContext(ctx)
 				logger.Warnf("failed to get matched policies: %v", err)
+				pipelineRunStatus.SetCondition(&apis.Condition{
+					Type:    ConditionTrustedResourcesVerified,
+					Status:  corev1.ConditionFalse,
+					Reason:  "No matched policies",
+					Message:  err.Error(),
+				})
 				return nil
 			}
 		}
+		pipelineRunStatus.SetCondition(&apis.Condition{
+			Type:    ConditionTrustedResourcesVerified,
+			Status:  corev1.ConditionFalse,
+			Reason:  "No matched policies",
+			Message:  err.Error(),
+		})
 		return fmt.Errorf("failed to get matched policies: %w", err)
 	}
 	pm, signature, err := prepareObjectMeta(pipelineObj.PipelineMetadata())

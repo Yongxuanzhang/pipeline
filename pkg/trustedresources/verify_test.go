@@ -395,7 +395,7 @@ func TestVerifyPipeline_Success(t *testing.T) {
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := test.SetupTrustedResourceConfig(context.Background(), tc.verificationNoMatchPolicy)
-			err := VerifyPipeline(ctx, tc.pipeline, k8sclient, tc.source, vps)
+			err := VerifyPipeline(ctx, tc.pipeline, k8sclient, tc.source, vps, nil)
 			if err != nil {
 				t.Fatalf("VerifyPipeline() get err: %v", err)
 			}
@@ -453,7 +453,7 @@ func TestVerifyPipeline_Error(t *testing.T) {
 	}}
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
-			err := VerifyPipeline(ctx, tc.pipeline, k8sclient, tc.source, tc.verificationPolicy)
+			err := VerifyPipeline(ctx, tc.pipeline, k8sclient, tc.source, tc.verificationPolicy, nil)
 			if err == nil {
 				t.Fatalf("VerifyPipeline() expects to get err but got nil")
 			}

@@ -76,13 +76,13 @@ func GetTaskFuncFromTaskRun(ctx context.Context, k8s kubernetes.Interface, tekto
 			}, configsource, nil
 		}
 	}
-	return GetVerifiedTaskFunc(ctx, k8s, tekton, requester, taskrun, taskrun.Spec.TaskRef, taskrun.Name, taskrun.Namespace, taskrun.Spec.ServiceAccountName, verificationpolicies)
+	return GetVerifiedTaskFunc(ctx, k8s, tekton, requester, taskrun, taskrun.Spec.TaskRef, taskrun.Name, taskrun.Namespace, taskrun.Spec.ServiceAccountName, verificationpolicies, &taskrun.Status)
 }
 
 // GetVerifiedTaskFunc is a wrapper of GetTaskFunc and return the function to verify the task
 // if there are matching verification policies
 func GetVerifiedTaskFunc(ctx context.Context, k8s kubernetes.Interface, tekton clientset.Interface, requester remoteresource.Requester,
-	owner kmeta.OwnerRefable, taskref *v1beta1.TaskRef, trName string, namespace, saName string, verificationpolicies []*v1alpha1.VerificationPolicy) GetTask {
+	owner kmeta.OwnerRefable, taskref *v1beta1.TaskRef, trName string, namespace, saName string, verificationpolicies []*v1alpha1.VerificationPolicy, taskRunStatus *v1beta1.TaskRunStatus) GetTask {
 	get := GetTaskFunc(ctx, k8s, tekton, requester, owner, taskref, trName, namespace, saName)
 
 	return func(context.Context, string) (v1beta1.TaskObject, *v1beta1.ConfigSource, error) {
@@ -94,7 +94,7 @@ func GetVerifiedTaskFunc(ctx context.Context, k8s kubernetes.Interface, tekton c
 		if s != nil {
 			source = s.URI
 		}
-		if err := trustedresources.VerifyTask(ctx, t, k8s, source, verificationpolicies); err != nil {
+		if err := trustedresources.VerifyTask(ctx, t, k8s, source, verificationpolicies, taskRunStatus); err != nil {
 			return nil, nil, fmt.Errorf("GetVerifiedTaskFunc failed: %w: %v", trustedresources.ErrResourceVerificationFailed, err)
 		}
 		return t, s, nil

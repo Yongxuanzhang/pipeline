@@ -50,7 +50,7 @@ const (
 // Return an error when no policies are found and trusted-resources-verification-no-match-policy is set to fail,
 // or the resource fails to pass matched enforce verification policy
 // source is from ConfigSource.URI, which will be used to match policy patterns. k8s is used to fetch secret from cluster
-func VerifyTask(ctx context.Context, taskObj v1beta1.TaskObject, k8s kubernetes.Interface, source string, verificationpolicies []*v1alpha1.VerificationPolicy) error {
+func VerifyTask(ctx context.Context, taskObj v1beta1.TaskObject, k8s kubernetes.Interface, source string, verificationpolicies []*v1alpha1.VerificationPolicy, taskRunStatus *v1beta1.TaskRunStatus) error {
 	matchedPolicies, err := getMatchedPolicies(taskObj.TaskMetadata().Name, source, verificationpolicies)
 	if err != nil {
 		if errors.Is(err, ErrNoMatchedPolicies) {
@@ -60,6 +60,12 @@ func VerifyTask(ctx context.Context, taskObj v1beta1.TaskObject, k8s kubernetes.
 			case config.WarnNoMatchPolicy:
 				logger := logging.FromContext(ctx)
 				logger.Warnf("failed to get matched policies: %v", err)
+				taskRunStatus.SetCondition(&apis.Condition{
+					Type:    ConditionTrustedResourcesVerified,
+					Status:  corev1.ConditionFalse,
+					Reason:  "No matched policies",
+					Message:  err.Error(),
+				})
 				return nil
 			}
 		}
@@ -78,7 +84,20 @@ func VerifyTask(ctx context.Context, taskObj v1beta1.TaskObject, k8s kubernetes.
 		Spec:       taskObj.TaskSpec(),
 	}
 
-	return verifyResource(ctx, &task, k8s, signature, matchedPolicies)
+	failWarnPolicies, err := verifyResource(ctx, &task, k8s, signature, matchedPolicies)
+	if failWarnPolicies{
+		taskRunStatus.SetCondition(&apis.Condition{
+			Type:    ConditionTrustedResourcesVerified,
+			Status:  corev1.ConditionFalse,
+			Reason:  "Resource verification failed",
+			Message:  err.Error(),
+		})
+	}
+	if err!=nil{
+
+	}
+
+	return err
 }
 
 // VerifyPipeline verifies the signature and public key against pipeline.
@@ -125,7 +144,26 @@ func VerifyPipeline(ctx context.Context, pipelineObj v1beta1.PipelineObject, k8s
 		Spec:       pipelineObj.PipelineSpec(),
 	}
 
-	return verifyResource(ctx, &pipeline, k8s, signature, matchedPolicies)
+	failWarnPolicies, err := verifyResource(ctx, &pipeline, k8s, signature, matchedPolicies)
+	if failWarnPolicies{
+		pipelineRunStatus.SetCondition(&apis.Condition{
+			Type:    ConditionTrustedResourcesVerified,
+			Status:  corev1.ConditionFalse,
+			Reason:  "No matched policies",
+			Message:  err.Error(),
+		})
+	}
+	if err!=nil{
+		pipelineRunStatus.SetCondition(&apis.Condition{
+			Type:    ConditionTrustedResourcesVerified,
+			Status:  corev1.ConditionFalse,
+			Reason:  "Resource verification failed",
+			Message:  err.Error(),
+		})
+	}
+
+
+	return err
 }
 
 // getMatchedPolicies filters out the policies by checking if the resource url (source) is matching any of the `patterns` in the `resources` list.
@@ -154,12 +192,13 @@ func getMatchedPolicies(resourceName string, source string, policies []*v1alpha1
 // 1. If multiple policies are matched, the resource needs to pass all of "enforced" mode policies to pass verification. We use AND logic on matched "enforce" policies.
 //    or the resource only matches "warn" mode policies.
 // 2. To pass one policy, the resource can pass any public keys in the policy. We use OR logic on public keys of one policy.
-func verifyResource(ctx context.Context, resource metav1.Object, k8s kubernetes.Interface, signature []byte, matchedPolicies []*v1alpha1.VerificationPolicy) error {
+func verifyResource(ctx context.Context, resource metav1.Object, k8s kubernetes.Interface, signature []byte, matchedPolicies []*v1alpha1.VerificationPolicy) (bool, error) {
+	failWarnPolicies := false
 	for _, p := range matchedPolicies {
 		passVerification := false
 		verifiers, err := verifier.FromPolicy(ctx, k8s, p)
 		if err != nil {
-			return fmt.Errorf("failed to get verifiers from policy: %w", err)
+			return false, fmt.Errorf("failed to get verifiers from policy: %w", err)
 		}
 		for _, verifier := range verifiers {
 			// if one of the verifier passes verification, then this policy passes verification
@@ -173,13 +212,15 @@ func verifyResource(ctx context.Context, resource metav1.Object, k8s kubernetes.
 			if p.Spec.Mode == v1alpha1.ModeWarn {
 				logger := logging.FromContext(ctx)
 				logger.Warnf("%w: resource %s in namespace %s fails verification", ErrResourceVerificationFailed, resource.GetName(), resource.GetNamespace())
+				failWarnPolicies = true
 			} else {
 				// if the mode is "enforce" or not set, return error.
-				return fmt.Errorf("%w: resource %s in namespace %s fails verification", ErrResourceVerificationFailed, resource.GetName(), resource.GetNamespace())
+				failWarnPolicies = false
+				return false, fmt.Errorf("%w: resource %s in namespace %s fails verification", ErrResourceVerificationFailed, resource.GetName(), resource.GetNamespace())
 			}
 		}
 	}
-	return nil
+	return failWarnPolicies, nil
 }
 
 // verifyInterface get the checksum of json marshalled object and verify it.

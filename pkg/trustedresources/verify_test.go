@@ -249,7 +249,7 @@ func TestVerifyTask_Success(t *testing.T) {
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := test.SetupTrustedResourceConfig(context.Background(), tc.verificationNoMatchPolicy)
-			err := VerifyTask(ctx, tc.task, k8sclient, tc.source, tc.verificationPolicies)
+			err := VerifyTask(ctx, tc.task, k8sclient, tc.source, tc.verificationPolicies, nil)
 			if err != nil {
 				t.Fatalf("VerifyTask() get err %v", err)
 			}
@@ -349,7 +349,7 @@ func TestVerifyTask_Error(t *testing.T) {
 	}}
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
-			err := VerifyTask(ctx, tc.task, k8sclient, tc.source, tc.verificationPolicy)
+			err := VerifyTask(ctx, tc.task, k8sclient, tc.source, tc.verificationPolicy, nil)
 			if !errors.Is(err, tc.expectedError) {
 				t.Errorf("VerifyTask got: %v, want: %v", err, tc.expectedError)
 			}

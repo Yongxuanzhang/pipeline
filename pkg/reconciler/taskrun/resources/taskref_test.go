@@ -42,6 +42,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	fakek8s "k8s.io/client-go/kubernetes/fake"
+	"knative.dev/pkg/apis"
 	"knative.dev/pkg/logging"
 	logtesting "knative.dev/pkg/logging/testing"
 )
@@ -817,8 +818,9 @@ func TestGetVerifiedTaskFunc_Success(t *testing.T) {
 					TaskRef:            taskRef,
 					ServiceAccountName: "default",
 				},
+				Status: v1beta1.TaskRunStatus{},
 			}
-			fn := resources.GetVerifiedTaskFunc(ctx, k8sclient, tektonclient, tc.requester, tr, tr.Spec.TaskRef, "", "default", "default", tc.policies)
+			fn := resources.GetVerifiedTaskFunc(ctx, k8sclient, tektonclient, tc.requester, tr, tr.Spec.TaskRef, "", "default", "default", tc.policies, (*[]apis.Condition)(&tr.Status.Conditions))
 
 			resolvedTask, source, err := fn(ctx, taskRef.Name)
 
@@ -947,8 +949,9 @@ func TestGetVerifiedTaskFunc_VerifyError(t *testing.T) {
 					TaskRef:            taskRef,
 					ServiceAccountName: "default",
 				},
+				Status: v1beta1.TaskRunStatus{},
 			}
-			fn := resources.GetVerifiedTaskFunc(ctx, k8sclient, tektonclient, tc.requester, tr, tr.Spec.TaskRef, "", "default", "default", vps)
+			fn := resources.GetVerifiedTaskFunc(ctx, k8sclient, tektonclient, tc.requester, tr, tr.Spec.TaskRef, "", "default", "default", vps, (*[]apis.Condition)(&tr.Status.Conditions))
 
 			resolvedTask, source, err := fn(ctx, taskRef.Name)
 
@@ -991,6 +994,7 @@ func TestGetVerifiedTaskFunc_GetFuncError(t *testing.T) {
 			},
 			ServiceAccountName: "default",
 		},
+		Status: v1beta1.TaskRunStatus{},
 	}
 
 	trResolutionError := &v1beta1.TaskRun{
@@ -1004,6 +1008,7 @@ func TestGetVerifiedTaskFunc_GetFuncError(t *testing.T) {
 			},
 			ServiceAccountName: "default",
 		},
+		Status: v1beta1.TaskRunStatus{},
 	}
 
 	testcases := []struct {
@@ -1040,7 +1045,7 @@ func TestGetVerifiedTaskFunc_GetFuncError(t *testing.T) {
 			store.OnConfigChanged(featureflags)
 			ctx = store.ToContext(ctx)
 
-			fn := resources.GetVerifiedTaskFunc(ctx, k8sclient, tektonclient, tc.requester, &tc.taskrun, tc.taskrun.Spec.TaskRef, "", "default", "default", vps)
+			fn := resources.GetVerifiedTaskFunc(ctx, k8sclient, tektonclient, tc.requester, &tc.taskrun, tc.taskrun.Spec.TaskRef, "", "default", "default", vps, (*[]apis.Condition)(&tc.taskrun.Status.Conditions))
 
 			_, _, err = fn(ctx, tc.taskrun.Spec.TaskRef.Name)
 

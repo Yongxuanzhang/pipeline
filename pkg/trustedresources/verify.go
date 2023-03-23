@@ -43,6 +43,15 @@ const (
 	SignatureAnnotation = "tekton.dev/signature"
 	// ConditionTrustedResourcesVerified specifies that the resources pass trusted resources verification or not.
 	ConditionTrustedResourcesVerified apis.ConditionType = "TrustedResourcesVerified"
+
+	// ReasonResourceVerificationFailed indicates that the resource fails the trusted resource verification,
+	// it could be the content has changed, signature is invalid or public key is invalid
+	ReasonResourceVerificationFailed = "ResourceVerificationFailed"
+
+	ReasonNoMatchedPolicies = "NoMatchedPolicies"
+
+	// ReasonResourceVerificationSucceeded indicates that the resource passes the trusted resource verification,
+	ReasonResourceVerificationSucceeded = "ResourceVerificationSucceeded"
 )
 
 // VerifyTask verifies the signature and public key against task.
@@ -50,7 +59,7 @@ const (
 // Return an error when no policies are found and trusted-resources-verification-no-match-policy is set to fail,
 // or the resource fails to pass matched enforce verification policy
 // source is from ConfigSource.URI, which will be used to match policy patterns. k8s is used to fetch secret from cluster
-func VerifyTask(ctx context.Context, taskObj v1beta1.TaskObject, k8s kubernetes.Interface, source string, verificationpolicies []*v1alpha1.VerificationPolicy, taskRunStatus *v1beta1.TaskRunStatus) error {
+func VerifyTask(ctx context.Context, taskObj v1beta1.TaskObject, k8s kubernetes.Interface, source string, verificationpolicies []*v1alpha1.VerificationPolicy, conditions *[]apis.Condition) error {
 	matchedPolicies, err := getMatchedPolicies(taskObj.TaskMetadata().Name, source, verificationpolicies)
 	if err != nil {
 		if errors.Is(err, ErrNoMatchedPolicies) {
@@ -60,15 +69,21 @@ func VerifyTask(ctx context.Context, taskObj v1beta1.TaskObject, k8s kubernetes.
 			case config.WarnNoMatchPolicy:
 				logger := logging.FromContext(ctx)
 				logger.Warnf("failed to get matched policies: %v", err)
-				taskRunStatus.SetCondition(&apis.Condition{
+				*conditions=append(*conditions, apis.Condition{
 					Type:    ConditionTrustedResourcesVerified,
 					Status:  corev1.ConditionFalse,
-					Reason:  "No matched policies",
+					Reason:  ReasonNoMatchedPolicies,
 					Message:  err.Error(),
 				})
 				return nil
 			}
 		}
+		*conditions=append(*conditions, apis.Condition{
+			Type:    ConditionTrustedResourcesVerified,
+			Status:  corev1.ConditionFalse,
+			Reason:  ReasonNoMatchedPolicies,
+			Message:  err.Error(),
+		})
 		return fmt.Errorf("failed to get matched policies: %w", err)
 	}
 
@@ -86,17 +101,28 @@ func VerifyTask(ctx context.Context, taskObj v1beta1.TaskObject, k8s kubernetes.
 
 	failWarnPolicies, err := verifyResource(ctx, &task, k8s, signature, matchedPolicies)
 	if failWarnPolicies{
-		taskRunStatus.SetCondition(&apis.Condition{
+		*conditions=append(*conditions,apis.Condition{
 			Type:    ConditionTrustedResourcesVerified,
 			Status:  corev1.ConditionFalse,
-			Reason:  "Resource verification failed",
-			Message:  err.Error(),
+			Reason:  ReasonResourceVerificationFailed,
+			Message:  "resource failed to pass the verification",
 		})
 	}
 	if err!=nil{
-
+		*conditions=append(*conditions,apis.Condition{
+			Type:    ConditionTrustedResourcesVerified,
+			Status:  corev1.ConditionFalse,
+			Reason:  ReasonResourceVerificationFailed,
+			Message:  err.Error(),
+		})
+	}else{
+		*conditions=append(*conditions,apis.Condition{
+			Type:    ConditionTrustedResourcesVerified,
+			Status:  corev1.ConditionTrue,
+			Reason:  ReasonResourceVerificationSucceeded,
+			Message: "Trusted resource verification succeeded",
+		})
 	}
-
 	return err
 }
 

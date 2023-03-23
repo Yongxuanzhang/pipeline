@@ -319,7 +319,7 @@ func (c *Reconciler) resolvePipelineState(
 		if err != nil {
 			return nil, fmt.Errorf("failed to list VerificationPolicies from namespace %s with error %v", pr.Namespace, err)
 		}
-		fn := tresources.GetVerifiedTaskFunc(ctx, c.KubeClientSet, c.PipelineClientSet, c.resolutionRequester, pr, task.TaskRef, trName, pr.Namespace, pr.Spec.ServiceAccountName, vp)
+		fn := tresources.GetVerifiedTaskFunc(ctx, c.KubeClientSet, c.PipelineClientSet, c.resolutionRequester, pr, task.TaskRef, trName, pr.Namespace, pr.Spec.ServiceAccountName, vp, (*[]apis.Condition)(&pr.Status.Conditions))
 
 		getRunObjectFunc := func(name string) (v1beta1.RunObject, error) {
 			r, err := c.customRunLister.CustomRuns(pr.Namespace).Get(name)

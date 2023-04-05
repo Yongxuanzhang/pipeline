@@ -18,14 +18,6 @@ limitations under the License.
 
 package v1alpha1
 
-// RunListerExpansion allows custom methods to be added to
-// RunLister.
-type RunListerExpansion interface{}
-
-// RunNamespaceListerExpansion allows custom methods to be added to
-// RunNamespaceLister.
-type RunNamespaceListerExpansion interface{}
-
 // VerificationPolicyListerExpansion allows custom methods to be added to
 // VerificationPolicyLister.
 type VerificationPolicyListerExpansion interface{}

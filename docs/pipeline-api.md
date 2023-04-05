@@ -5936,227 +5936,10 @@ overriding any MountPath specified in the Task&rsquo;s WorkspaceDeclaration.</p>
 </div>
 Resource Types:
 <ul><li>
-<a href="#tekton.dev/v1alpha1.Run">Run</a>
-</li><li>
 <a href="#tekton.dev/v1alpha1.VerificationPolicy">VerificationPolicy</a>
 </li><li>
 <a href="#tekton.dev/v1alpha1.PipelineResource">PipelineResource</a>
 </li></ul>
-<h3 id="tekton.dev/v1alpha1.Run">Run
-</h3>
-<div>
-<p>Run represents a single execution of a Custom Task.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>apiVersion</code><br/>
-string</td>
-<td>
-<code>
-tekton.dev/v1alpha1
-</code>
-</td>
-</tr>
-<tr>
-<td>
-<code>kind</code><br/>
-string
-</td>
-<td><code>Run</code></td>
-</tr>
-<tr>
-<td>
-<code>metadata</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.24/#objectmeta-v1-meta">
-Kubernetes meta/v1.ObjectMeta
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-Refer to the Kubernetes API documentation for the fields of the
-<code>metadata</code> field.
-</td>
-</tr>
-<tr>
-<td>
-<code>spec</code><br/>
-<em>
-<a href="#tekton.dev/v1alpha1.RunSpec">
-RunSpec
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<br/>
-<br/>
-<table>
-<tr>
-<td>
-<code>ref</code><br/>
-<em>
-<a href="#tekton.dev/v1beta1.TaskRef">
-TaskRef
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-</td>
-</tr>
-<tr>
-<td>
-<code>spec</code><br/>
-<em>
-<a href="#tekton.dev/v1alpha1.EmbeddedRunSpec">
-EmbeddedRunSpec
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Spec is a specification of a custom task</p>
-<br/>
-<br/>
-<table>
-</table>
-</td>
-</tr>
-<tr>
-<td>
-<code>params</code><br/>
-<em>
-<a href="#tekton.dev/v1beta1.Params">
-Params
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-</td>
-</tr>
-<tr>
-<td>
-<code>status</code><br/>
-<em>
-<a href="#tekton.dev/v1alpha1.RunSpecStatus">
-RunSpecStatus
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Used for cancelling a run (and maybe more later on)</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>statusMessage</code><br/>
-<em>
-<a href="#tekton.dev/v1alpha1.RunSpecStatusMessage">
-RunSpecStatusMessage
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Status message for cancellation.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>retries</code><br/>
-<em>
-int
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Used for propagating retries count to custom tasks</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>serviceAccountName</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-</td>
-</tr>
-<tr>
-<td>
-<code>podTemplate</code><br/>
-<em>
-<a href="#tekton.dev/unversioned.Template">
-Template
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>PodTemplate holds pod specific configuration</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>timeout</code><br/>
-<em>
-<a href="https://godoc.org/k8s.io/apimachinery/pkg/apis/meta/v1#Duration">
-Kubernetes meta/v1.Duration
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Time after which the custom-task times out.
-Refer Go&rsquo;s ParseDuration documentation for expected format: <a href="https://golang.org/pkg/time/#ParseDuration">https://golang.org/pkg/time/#ParseDuration</a></p>
-</td>
-</tr>
-<tr>
-<td>
-<code>workspaces</code><br/>
-<em>
-<a href="#tekton.dev/v1beta1.WorkspaceBinding">
-[]WorkspaceBinding
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Workspaces is a list of WorkspaceBindings from volumes to workspaces.</p>
-</td>
-</tr>
-</table>
-</td>
-</tr>
-<tr>
-<td>
-<code>status</code><br/>
-<em>
-<a href="#tekton.dev/v1alpha1.RunStatus">
-RunStatus
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-</td>
-</tr>
-</tbody>
-</table>
 <h3 id="tekton.dev/v1alpha1.VerificationPolicy">VerificationPolicy
 </h3>
 <div>
@@ -6440,77 +6223,6 @@ KeyRef
 </tr>
 </tbody>
 </table>
-<h3 id="tekton.dev/v1alpha1.EmbeddedRunSpec">EmbeddedRunSpec
-</h3>
-<p>
-(<em>Appears on:</em><a href="#tekton.dev/v1alpha1.RunSpec">RunSpec</a>)
-</p>
-<div>
-<p>EmbeddedRunSpec allows custom task definitions to be embedded</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>metadata</code><br/>
-<em>
-<a href="#tekton.dev/v1beta1.PipelineTaskMetadata">
-PipelineTaskMetadata
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-</td>
-</tr>
-<tr>
-<td>
-<code>spec</code><br/>
-<em>
-k8s.io/apimachinery/pkg/runtime.RawExtension
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Spec is a specification of a custom task</p>
-<br/>
-<br/>
-<table>
-<tr>
-<td>
-<code>-</code><br/>
-<em>
-[]byte
-</em>
-</td>
-<td>
-<p>Raw is the underlying serialization of this object.</p>
-<p>TODO: Determine how to detect ContentType and ContentEncoding of &lsquo;Raw&rsquo; data.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>-</code><br/>
-<em>
-k8s.io/apimachinery/pkg/runtime.Object
-</em>
-</td>
-<td>
-<p>Object can hold a representation of this extension - useful for working with versioned
-structs.</p>
-</td>
-</tr>
-</table>
-</td>
-</tr>
-</tbody>
-</table>
 <h3 id="tekton.dev/v1alpha1.HashAlgorithm">HashAlgorithm
 (<code>string</code> alias)</h3>
 <p>
@@ -6635,183 +6347,6 @@ Hub resource: <a href="https://artifacthub.io/*">https://artifacthub.io/*</a>,</
 </tr>
 </tbody>
 </table>
-<h3 id="tekton.dev/v1alpha1.RunReason">RunReason
-(<code>string</code> alias)</h3>
-<div>
-<p>RunReason is an enum used to store all Run reason for the Succeeded condition that are controlled by the Run itself.</p>
-</div>
-<h3 id="tekton.dev/v1alpha1.RunSpec">RunSpec
-</h3>
-<p>
-(<em>Appears on:</em><a href="#tekton.dev/v1alpha1.Run">Run</a>)
-</p>
-<div>
-<p>RunSpec defines the desired state of Run</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>ref</code><br/>
-<em>
-<a href="#tekton.dev/v1beta1.TaskRef">
-TaskRef
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-</td>
-</tr>
-<tr>
-<td>
-<code>spec</code><br/>
-<em>
-<a href="#tekton.dev/v1alpha1.EmbeddedRunSpec">
-EmbeddedRunSpec
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Spec is a specification of a custom task</p>
-<br/>
-<br/>
-<table>
-</table>
-</td>
-</tr>
-<tr>
-<td>
-<code>params</code><br/>
-<em>
-<a href="#tekton.dev/v1beta1.Params">
-Params
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-</td>
-</tr>
-<tr>
-<td>
-<code>status</code><br/>
-<em>
-<a href="#tekton.dev/v1alpha1.RunSpecStatus">
-RunSpecStatus
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Used for cancelling a run (and maybe more later on)</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>statusMessage</code><br/>
-<em>
-<a href="#tekton.dev/v1alpha1.RunSpecStatusMessage">
-RunSpecStatusMessage
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Status message for cancellation.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>retries</code><br/>
-<em>
-int
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Used for propagating retries count to custom tasks</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>serviceAccountName</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-</td>
-</tr>
-<tr>
-<td>
-<code>podTemplate</code><br/>
-<em>
-<a href="#tekton.dev/unversioned.Template">
-Template
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>PodTemplate holds pod specific configuration</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>timeout</code><br/>
-<em>
-<a href="https://godoc.org/k8s.io/apimachinery/pkg/apis/meta/v1#Duration">
-Kubernetes meta/v1.Duration
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Time after which the custom-task times out.
-Refer Go&rsquo;s ParseDuration documentation for expected format: <a href="https://golang.org/pkg/time/#ParseDuration">https://golang.org/pkg/time/#ParseDuration</a></p>
-</td>
-</tr>
-<tr>
-<td>
-<code>workspaces</code><br/>
-<em>
-<a href="#tekton.dev/v1beta1.WorkspaceBinding">
-[]WorkspaceBinding
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Workspaces is a list of WorkspaceBindings from volumes to workspaces.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="tekton.dev/v1alpha1.RunSpecStatus">RunSpecStatus
-(<code>string</code> alias)</h3>
-<p>
-(<em>Appears on:</em><a href="#tekton.dev/v1alpha1.RunSpec">RunSpec</a>)
-</p>
-<div>
-<p>RunSpecStatus defines the taskrun spec status the user can provide</p>
-</div>
-<h3 id="tekton.dev/v1alpha1.RunSpecStatusMessage">RunSpecStatusMessage
-(<code>string</code> alias)</h3>
-<p>
-(<em>Appears on:</em><a href="#tekton.dev/v1alpha1.RunSpec">RunSpec</a>)
-</p>
-<div>
-<p>RunSpecStatusMessage defines human readable status messages for the TaskRun.</p>
-</div>
 <h3 id="tekton.dev/v1alpha1.VerificationPolicySpec">VerificationPolicySpec
 </h3>
 <p>
@@ -7172,7 +6707,7 @@ string
 <h3 id="tekton.dev/v1alpha1.RunStatus">RunStatus
 </h3>
 <p>
-(<em>Appears on:</em><a href="#tekton.dev/v1alpha1.Run">Run</a>, <a href="#tekton.dev/v1alpha1.RunStatusFields">RunStatusFields</a>)
+(<em>Appears on:</em><a href="#tekton.dev/v1alpha1.RunStatusFields">RunStatusFields</a>)
 </p>
 <div>
 <p>RunStatus defines the observed state of Run</p>
@@ -9552,7 +9087,7 @@ map[string]string
 <h3 id="tekton.dev/v1beta1.Params">Params
 (<code>[]github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1.Param</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#tekton.dev/v1alpha1.RunSpec">RunSpec</a>, <a href="#tekton.dev/v1beta1.CustomRunSpec">CustomRunSpec</a>, <a href="#tekton.dev/v1beta1.IncludeParams">IncludeParams</a>, <a href="#tekton.dev/v1beta1.Matrix">Matrix</a>, <a href="#tekton.dev/v1beta1.PipelineRunSpec">PipelineRunSpec</a>, <a href="#tekton.dev/v1beta1.PipelineTask">PipelineTask</a>, <a href="#tekton.dev/v1beta1.ResolverRef">ResolverRef</a>, <a href="#tekton.dev/v1beta1.TaskRunSpec">TaskRunSpec</a>)
+(<em>Appears on:</em><a href="#tekton.dev/v1beta1.CustomRunSpec">CustomRunSpec</a>, <a href="#tekton.dev/v1beta1.IncludeParams">IncludeParams</a>, <a href="#tekton.dev/v1beta1.Matrix">Matrix</a>, <a href="#tekton.dev/v1beta1.PipelineRunSpec">PipelineRunSpec</a>, <a href="#tekton.dev/v1beta1.PipelineTask">PipelineTask</a>, <a href="#tekton.dev/v1beta1.ResolverRef">ResolverRef</a>, <a href="#tekton.dev/v1beta1.TaskRunSpec">TaskRunSpec</a>)
 </p>
 <div>
 <p>Params is a list of Param</p>
@@ -10820,7 +10355,7 @@ string
 <h3 id="tekton.dev/v1beta1.PipelineTaskMetadata">PipelineTaskMetadata
 </h3>
 <p>
-(<em>Appears on:</em><a href="#tekton.dev/v1alpha1.EmbeddedRunSpec">EmbeddedRunSpec</a>, <a href="#tekton.dev/v1beta1.EmbeddedCustomRunSpec">EmbeddedCustomRunSpec</a>, <a href="#tekton.dev/v1beta1.EmbeddedTask">EmbeddedTask</a>, <a href="#tekton.dev/v1beta1.PipelineTaskRunSpec">PipelineTaskRunSpec</a>)
+(<em>Appears on:</em><a href="#tekton.dev/v1beta1.EmbeddedCustomRunSpec">EmbeddedCustomRunSpec</a>, <a href="#tekton.dev/v1beta1.EmbeddedTask">EmbeddedTask</a>, <a href="#tekton.dev/v1beta1.PipelineTaskRunSpec">PipelineTaskRunSpec</a>)
 </p>
 <div>
 <p>PipelineTaskMetadata contains the labels or annotations for an EmbeddedTask</p>
@@ -13025,7 +12560,7 @@ Default is false.</p>
 <h3 id="tekton.dev/v1beta1.TaskRef">TaskRef
 </h3>
 <p>
-(<em>Appears on:</em><a href="#tekton.dev/v1alpha1.RunSpec">RunSpec</a>, <a href="#tekton.dev/v1beta1.CustomRunSpec">CustomRunSpec</a>, <a href="#tekton.dev/v1beta1.PipelineTask">PipelineTask</a>, <a href="#tekton.dev/v1beta1.TaskRunSpec">TaskRunSpec</a>)
+(<em>Appears on:</em><a href="#tekton.dev/v1beta1.CustomRunSpec">CustomRunSpec</a>, <a href="#tekton.dev/v1beta1.PipelineTask">PipelineTask</a>, <a href="#tekton.dev/v1beta1.TaskRunSpec">TaskRunSpec</a>)
 </p>
 <div>
 <p>TaskRef can be used to refer to a specific instance of a task.</p>
@@ -14368,7 +13903,7 @@ All of them need to evaluate to True for a guarded Task to be executed.</p>
 <h3 id="tekton.dev/v1beta1.WorkspaceBinding">WorkspaceBinding
 </h3>
 <p>
-(<em>Appears on:</em><a href="#tekton.dev/v1alpha1.RunSpec">RunSpec</a>, <a href="#tekton.dev/v1beta1.CustomRunSpec">CustomRunSpec</a>, <a href="#tekton.dev/v1beta1.PipelineRunSpec">PipelineRunSpec</a>, <a href="#tekton.dev/v1beta1.TaskRunSpec">TaskRunSpec</a>)
+(<em>Appears on:</em><a href="#tekton.dev/v1beta1.CustomRunSpec">CustomRunSpec</a>, <a href="#tekton.dev/v1beta1.PipelineRunSpec">PipelineRunSpec</a>, <a href="#tekton.dev/v1beta1.TaskRunSpec">TaskRunSpec</a>)
 </p>
 <div>
 <p>WorkspaceBinding maps a Task&rsquo;s declared workspace to a Volume.</p>

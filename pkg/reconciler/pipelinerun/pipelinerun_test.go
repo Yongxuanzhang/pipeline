@@ -33,7 +33,6 @@ import (
 	"github.com/google/go-containerregistry/pkg/registry"
 	"github.com/tektoncd/pipeline/pkg/apis/config"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline"
-	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1alpha1"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	resolutionutil "github.com/tektoncd/pipeline/pkg/internal/resolution"
 	"github.com/tektoncd/pipeline/pkg/reconciler/events/cloudevent"
@@ -105,7 +104,6 @@ const (
 	apiFieldsFeatureFlag           = "enable-api-fields"
 	ociBundlesFeatureFlag          = "enable-tekton-oci-bundles"
 	maxMatrixCombinationsCountFlag = "default-max-matrix-combinations-count"
-	customTaskVersionFlag          = "custom-task-version"
 )
 
 type PipelineRunTest struct {
@@ -367,189 +365,9 @@ spec:
 }
 
 // TestReconcile_CustomTask runs "Reconcile" on a PipelineRun with one Custom
-// Task reference that has not been run yet.  It verifies that the Run is
-// created, it checks the resulting API actions, status and events.
-func TestReconcile_CustomTask(t *testing.T) {
-	names.TestingSeed()
-	const pipelineRunName = "test-pipelinerun"
-	const namespace = "namespace"
-
-	simpleCustomTaskPRYAML := `metadata:
-  name: test-pipelinerun
-  namespace: namespace
-spec:
-  pipelineSpec:
-    tasks:
-    - name: custom-task
-      params:
-      - name: param1
-        value: value1
-      retries: 3
-      taskRef:
-        apiVersion: example.dev/v0
-        kind: Example
-`
-	simpleCustomTaskWantRunYAML := `metadata:
-  annotations: {}
-  labels:
-    tekton.dev/memberOf: tasks
-    tekton.dev/pipeline: test-pipelinerun
-    tekton.dev/pipelineRun: test-pipelinerun
-    tekton.dev/pipelineTask: custom-task
-  name: test-pipelinerun-custom-task
-  namespace: namespace
-  ownerReferences:
-  - apiVersion: tekton.dev/v1beta1
-    blockOwnerDeletion: true
-    controller: true
-    kind: PipelineRun
-    name: test-pipelinerun
-spec:
-  params:
-  - name: param1
-    value: value1
-  ref:
-    apiVersion: example.dev/v0
-    kind: Example
-  retries: 3
-  serviceAccountName: default
-`
-
-	tcs := []struct {
-		name    string
-		pr      *v1beta1.PipelineRun
-		wantRun *v1alpha1.Run
-	}{{
-		name:    "simple custom task with taskRef",
-		pr:      parse.MustParseV1beta1PipelineRun(t, simpleCustomTaskPRYAML),
-		wantRun: parse.MustParseRun(t, simpleCustomTaskWantRunYAML),
-	}, {
-		name: "simple custom task with taskSpec",
-		pr: parse.MustParseV1beta1PipelineRun(t, `
-metadata:
-  name: test-pipelinerun
-  namespace: namespace
-spec:
-  pipelineSpec:
-    tasks:
-    - name: custom-task
-      params:
-      - name: param1
-        value: value1
-      taskSpec:
-        apiVersion: example.dev/v0
-        kind: Example
-        metadata:
-          labels:
-            test-label: test
-        spec:
-          field1: 123
-          field2: value
-`),
-		wantRun: mustParseRunWithObjectMeta(t,
-			taskRunObjectMeta("test-pipelinerun-custom-task", "namespace", "test-pipelinerun", "test-pipelinerun", "custom-task", false),
-			`
-spec:
-  params:
-  - name: param1
-    value: value1
-  serviceAccountName: default
-  spec:
-    apiVersion: example.dev/v0
-    kind: Example
-    metadata:
-      labels:
-        test-label: test
-    spec:
-      field1: 123
-      field2: value
-`),
-	}, {
-		name: "custom task with workspace",
-		pr: parse.MustParseV1beta1PipelineRun(t, `
-metadata:
-  name: test-pipelinerun
-  namespace: namespace
-spec:
-  pipelineSpec:
-    tasks:
-    - name: custom-task
-      taskRef:
-        apiVersion: example.dev/v0
-        kind: Example
-      workspaces:
-      - name: taskws
-        subPath: bar
-        workspace: pipelinews
-    workspaces:
-    - name: pipelinews
-  workspaces:
-  - name: pipelinews
-    persistentVolumeClaim:
-      claimName: myclaim
-    subPath: foo
-`),
-		wantRun: mustParseRunWithObjectMeta(t,
-			taskRunObjectMetaWithAnnotations("test-pipelinerun-custom-task", "namespace", "test-pipelinerun",
-				"test-pipelinerun", "custom-task", false, map[string]string{
-					"pipeline.tekton.dev/affinity-assistant": getAffinityAssistantName("pipelinews", pipelineRunName),
-				}),
-			`
-spec:
-  ref:
-    apiVersion: example.dev/v0
-    kind: Example
-  serviceAccountName: default
-  workspaces:
-  - name: taskws
-    persistentVolumeClaim:
-      claimName: myclaim
-    subPath: foo/bar
-`),
-	}}
-
-	for _, tc := range tcs {
-		t.Run(tc.name, func(t *testing.T) {
-			cms := []*corev1.ConfigMap{withCustomTaskVersion(newFeatureFlagsConfigMap(), "v1alpha1")}
-
-			d := test.Data{
-				PipelineRuns: []*v1beta1.PipelineRun{tc.pr},
-				ConfigMaps:   cms,
-			}
-			prt := newPipelineRunTest(t, d)
-			defer prt.Cancel()
-
-			wantEvents := []string{
-				"Normal Started",
-				"Normal Running Tasks Completed: 0",
-			}
-			reconciledRun, clients := prt.reconcileRun(namespace, pipelineRunName, wantEvents, false)
-
-			actions := clients.Pipeline.Actions()
-			if len(actions) < 2 {
-				t.Fatalf("Expected client to have at least two action implementation but it has %d", len(actions))
-			}
-
-			// Check that the expected Run was created.
-			actual := actions[0].(ktesting.CreateAction).GetObject()
-			// Ignore the TypeMeta field, because parse.MustParseRun automatically populates it but the "actual" Run won't have it.
-			if d := cmp.Diff(tc.wantRun, actual, cmpopts.IgnoreFields(v1alpha1.Run{}, "TypeMeta")); d != "" {
-				t.Errorf("expected to see Run created: %s", diff.PrintWantGot(d))
-			}
-
-			// This PipelineRun is in progress now and the status should reflect that
-			checkPipelineRunConditionStatusAndReason(t, reconciledRun, corev1.ConditionUnknown, v1beta1.PipelineRunReasonRunning.String())
-
-			verifyCustomRunOrRunStatusesCount(t, run, reconciledRun.Status, 1)
-			verifyCustomRunOrRunStatusesNames(t, run, reconciledRun.Status, tc.wantRun.Name)
-		})
-	}
-}
-
-// TestReconcile_V1Beta1CustomTask runs "Reconcile" on a PipelineRun with one Custom
-// Task reference that has not been run yet, with the custom-task-version feature flag set to "v1beta1".
+// Task reference that has not been run yet.
 // It verifies that the CustomRun is created, it checks the resulting API actions, status and events.
-func TestReconcile_V1Beta1CustomTask(t *testing.T) {
+func TestReconcile_CustomTask(t *testing.T) {
 	names.TestingSeed()
 	const pipelineRunName = "test-pipelinerun"
 	const namespace = "namespace"
@@ -690,11 +508,11 @@ spec:
 
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
-			cms := []*corev1.ConfigMap{withCustomTaskVersion(newFeatureFlagsConfigMap(), "v1beta1")}
+			//cms := []*corev1.ConfigMap{withCustomTaskVersion(newFeatureFlagsConfigMap(), "v1beta1")}
 
 			d := test.Data{
 				PipelineRuns: []*v1beta1.PipelineRun{tc.pr},
-				ConfigMaps:   cms,
+				//ConfigMaps:   cms,
 			}
 			prt := newPipelineRunTest(t, d)
 			defer prt.Cancel()
@@ -1232,15 +1050,6 @@ func TestReconcileOnCompletedPipelineRun(t *testing.T) {
 	taskRunName := "test-pipeline-run-completed-hello-world-task-run"
 	runName := "test-pipeline-run-completed-hello-world-run"
 	pipelineRunName := "test-pipeline-run-completed"
-	rs := []*v1alpha1.Run{parse.MustParseRun(t, fmt.Sprintf(`
-metadata:
-  name: %s
-spec: {}
-status:
-  conditions:
-  - status: "False"
-  type: Succeeded
-`, runName))}
 	prs := []*v1beta1.PipelineRun{parse.MustParseV1beta1PipelineRun(t, fmt.Sprintf(`
 metadata:
   name: %s
@@ -1305,7 +1114,6 @@ status:
 		Pipelines:    ps,
 		Tasks:        ts,
 		TaskRuns:     trs,
-		Runs:         rs,
 	}
 	prt := newPipelineRunTest(t, d)
 	defer prt.Cancel()
@@ -1377,11 +1185,12 @@ func withOCIBundles(cm *corev1.ConfigMap) *corev1.ConfigMap {
 	return newCM
 }
 
+/*
 func withCustomTaskVersion(cm *corev1.ConfigMap, flagVal string) *corev1.ConfigMap {
 	newCM := cm.DeepCopy()
 	newCM.Data[customTaskVersionFlag] = flagVal
 	return newCM
-}
+}*/
 
 func withMaxMatrixCombinationsCount(cm *corev1.ConfigMap, count int) *corev1.ConfigMap {
 	newCM := cm.DeepCopy()
@@ -4836,7 +4645,7 @@ metadata:
 					EnableProvenanceInStatus:         true,
 					ResultExtractionMethod:           config.DefaultResultExtractionMethod,
 					MaxResultSize:                    config.DefaultMaxResultSize,
-					CustomTaskVersion:                config.DefaultCustomTaskVersion,
+					//CustomTaskVersion:                config.DefaultCustomTaskVersion,
 				},
 			},
 		},
@@ -7123,13 +6932,6 @@ func mustParseTaskRunWithObjectMeta(t *testing.T, objectMeta metav1.ObjectMeta, 
 func mustParseCustomRunWithObjectMeta(t *testing.T, objectMeta metav1.ObjectMeta, asYAML string) *v1beta1.CustomRun {
 	t.Helper()
 	r := parse.MustParseCustomRun(t, asYAML)
-	r.ObjectMeta = objectMeta
-	return r
-}
-
-func mustParseRunWithObjectMeta(t *testing.T, objectMeta metav1.ObjectMeta, asYAML string) *v1alpha1.Run {
-	t.Helper()
-	r := parse.MustParseRun(t, asYAML)
 	r.ObjectMeta = objectMeta
 	return r
 }

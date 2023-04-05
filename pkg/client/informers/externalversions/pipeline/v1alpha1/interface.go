@@ -24,8 +24,6 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
-	// Runs returns a RunInformer.
-	Runs() RunInformer
 	// VerificationPolicies returns a VerificationPolicyInformer.
 	VerificationPolicies() VerificationPolicyInformer
 }
@@ -39,11 +37,6 @@ type version struct {
 // New returns a new Interface.
 func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakListOptions internalinterfaces.TweakListOptionsFunc) Interface {
 	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
-}
-
-// Runs returns a RunInformer.
-func (v *version) Runs() RunInformer {
-	return &runInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // VerificationPolicies returns a VerificationPolicyInformer.

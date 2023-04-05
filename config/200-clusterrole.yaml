@@ -28,7 +28,7 @@ rules:
     # Controller needs cluster access to all of the CRDs that it is responsible for
     # managing.
   - apiGroups: ["tekton.dev"]
-    resources: ["tasks", "clustertasks", "taskruns", "pipelines", "pipelineruns", "runs", "customruns"]
+    resources: ["tasks", "clustertasks", "taskruns", "pipelines", "pipelineruns", "customruns"]
     verbs: ["get", "list", "create", "update", "delete", "patch", "watch"]
   - apiGroups: ["tekton.dev"]
     resources: ["verificationpolicies"]
@@ -88,7 +88,6 @@ rules:
     resourceNames:
       - pipelines.tekton.dev
       - pipelineruns.tekton.dev
-      - runs.tekton.dev
       - tasks.tekton.dev
       - clustertasks.tekton.dev
       - taskruns.tekton.dev

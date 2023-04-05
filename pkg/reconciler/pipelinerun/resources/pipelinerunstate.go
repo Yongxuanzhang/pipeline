@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline"
-	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1alpha1"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	"github.com/tektoncd/pipeline/pkg/reconciler/pipeline/dag"
 	"go.uber.org/zap"
@@ -182,13 +181,6 @@ func (state PipelineRunState) GetRunsResults() map[string][]v1beta1.CustomRunRes
 			switch r := rpt.RunObject.(type) {
 			case *v1beta1.CustomRun:
 				results[rpt.PipelineTask.Name] = r.Status.Results
-			case *v1alpha1.Run:
-				for _, origRes := range r.Status.Results {
-					results[rpt.PipelineTask.Name] = append(results[rpt.PipelineTask.Name], v1beta1.CustomRunResult{
-						Name:  origRes.Name,
-						Value: origRes.Value,
-					})
-				}
 			}
 		}
 	}
@@ -231,9 +223,6 @@ func (t *ResolvedPipelineTask) getChildRefForRun(runObj v1beta1.RunObject) v1bet
 	case *v1beta1.CustomRun:
 		apiVersion = v1beta1.SchemeGroupVersion.String()
 		kind = pipeline.CustomRunControllerName
-	case *v1alpha1.Run:
-		apiVersion = v1alpha1.SchemeGroupVersion.String()
-		kind = pipeline.RunControllerName
 	}
 
 	return v1beta1.ChildStatusReference{
@@ -300,7 +289,7 @@ func (state PipelineRunState) getRetriableRuns(candidateTasks sets.String) []*Re
 					}
 				}
 			}
-			if status.IsFalse() && !t.isCancelled() && t.isRunRetriable() {
+			if status.IsFalse() && !t.isCancelled() {
 				tasks = append(tasks, t)
 			}
 		}

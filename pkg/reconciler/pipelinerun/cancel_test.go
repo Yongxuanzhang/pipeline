@@ -22,7 +22,6 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/tektoncd/pipeline/pkg/apis/config"
-	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1alpha1"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	_ "github.com/tektoncd/pipeline/pkg/pipelinerunmetrics/fake" // Make sure the pipelinerunmetrics are setup
 	ttesting "github.com/tektoncd/pipeline/pkg/reconciler/testing"
@@ -41,7 +40,6 @@ func TestCancelPipelineRun(t *testing.T) {
 
 		pipelineRun *v1beta1.PipelineRun
 		taskRuns    []*v1beta1.TaskRun
-		runs        []*v1alpha1.Run
 		customRuns  []*v1beta1.CustomRun
 		wantErr     bool
 	}{{
@@ -196,10 +194,6 @@ func TestCancelPipelineRun(t *testing.T) {
 			{ObjectMeta: metav1.ObjectMeta{Name: "t1"}},
 			{ObjectMeta: metav1.ObjectMeta{Name: "t2"}},
 		},
-		runs: []*v1alpha1.Run{
-			{ObjectMeta: metav1.ObjectMeta{Name: "r1"}},
-			{ObjectMeta: metav1.ObjectMeta{Name: "r2"}},
-		},
 	}, {
 		name: "child-references-some-missing",
 		pipelineRun: &v1beta1.PipelineRun{
@@ -234,9 +228,6 @@ func TestCancelPipelineRun(t *testing.T) {
 		},
 		taskRuns: []*v1beta1.TaskRun{
 			{ObjectMeta: metav1.ObjectMeta{Name: "t2"}},
-		},
-		runs: []*v1alpha1.Run{
-			{ObjectMeta: metav1.ObjectMeta{Name: "r1"}},
 		},
 	}, {
 		name: "child-references-with-customruns",
@@ -301,7 +292,6 @@ func TestCancelPipelineRun(t *testing.T) {
 			d := test.Data{
 				PipelineRuns: []*v1beta1.PipelineRun{tc.pipelineRun},
 				TaskRuns:     tc.taskRuns,
-				Runs:         tc.runs,
 				CustomRuns:   tc.customRuns,
 			}
 			ctx, _ := ttesting.SetupFakeContext(t)
@@ -340,21 +330,6 @@ func TestCancelPipelineRun(t *testing.T) {
 						}
 					}
 				}
-				if tc.runs != nil {
-					for _, expectedRun := range tc.runs {
-						r, err := c.Pipeline.TektonV1alpha1().Runs("").Get(ctx, expectedRun.Name, metav1.GetOptions{})
-						if err != nil {
-							t.Fatalf("couldn't get expected Run %s, got error %s", expectedRun.Name, err)
-						}
-						if r.Spec.Status != v1alpha1.RunSpecStatusCancelled {
-							t.Errorf("expected task %q to be marked as cancelled, was %q", r.Name, r.Spec.Status)
-						}
-						expectedStatusMessage := v1alpha1.RunCancelledByPipelineMsg
-						if r.Spec.StatusMessage != expectedStatusMessage {
-							t.Errorf("expected task %q to have status message %s but was %s", r.Name, expectedStatusMessage, r.Spec.StatusMessage)
-						}
-					}
-				}
 				if tc.customRuns != nil {
 					for _, expectedCustomRun := range tc.customRuns {
 						cr, err := c.Pipeline.TektonV1beta1().CustomRuns("").Get(ctx, expectedCustomRun.Name, metav1.GetOptions{})
@@ -378,32 +353,13 @@ func TestCancelPipelineRun(t *testing.T) {
 func TestGetChildObjectsFromPRStatusForTaskNames(t *testing.T) {
 	testCases := []struct {
 		name                   string
-		useV1Beta1CustomTask   bool
 		prStatus               v1beta1.PipelineRunStatus
 		taskNames              sets.String
 		expectedTRNames        []string
-		expectedRunNames       []string
 		expectedCustomRunNames []string
 		hasError               bool
-	}{
-		{
-			name: "runs",
-			prStatus: v1beta1.PipelineRunStatus{PipelineRunStatusFields: v1beta1.PipelineRunStatusFields{
-				ChildReferences: []v1beta1.ChildStatusReference{{
-					TypeMeta: runtime.TypeMeta{
-						APIVersion: v1alpha1.SchemeGroupVersion.String(),
-						Kind:       run,
-					},
-					Name:             "r1",
-					PipelineTaskName: "run-1",
-				}},
-			}},
-			expectedTRNames:  nil,
-			expectedRunNames: []string{"r1"},
-			hasError:         false,
-		}, {
-			name:                 "beta custom tasks",
-			useV1Beta1CustomTask: true,
+	}{{
+			name: "beta custom tasks",
 			prStatus: v1beta1.PipelineRunStatus{PipelineRunStatusFields: v1beta1.PipelineRunStatusFields{
 				ChildReferences: []v1beta1.ChildStatusReference{{
 					TypeMeta: runtime.TypeMeta{
@@ -429,7 +385,6 @@ func TestGetChildObjectsFromPRStatusForTaskNames(t *testing.T) {
 				}},
 			}},
 			expectedTRNames:        nil,
-			expectedRunNames:       nil,
 			expectedCustomRunNames: nil,
 			hasError:               true,
 		},
@@ -440,13 +395,10 @@ func TestGetChildObjectsFromPRStatusForTaskNames(t *testing.T) {
 			ctx, _ := ttesting.SetupFakeContext(t)
 			cfg := config.NewStore(logtesting.TestLogger(t))
 			cm := newFeatureFlagsConfigMap()
-			if tc.useV1Beta1CustomTask {
-				cm = withCustomTaskVersion(cm, config.CustomTaskVersionBeta)
-			}
 			cfg.OnConfigChanged(cm)
 			ctx = cfg.ToContext(ctx)
 
-			trNames, customRunNames, runNames, err := getChildObjectsFromPRStatusForTaskNames(ctx, tc.prStatus, tc.taskNames)
+			trNames, customRunNames, err := getChildObjectsFromPRStatusForTaskNames(ctx, tc.prStatus, tc.taskNames)
 
 			if tc.hasError {
 				if err == nil {
@@ -458,9 +410,6 @@ func TestGetChildObjectsFromPRStatusForTaskNames(t *testing.T) {
 
 			if d := cmp.Diff(tc.expectedTRNames, trNames); d != "" {
 				t.Errorf("expected to see TaskRun names %v. Diff %s", tc.expectedTRNames, diff.PrintWantGot(d))
-			}
-			if d := cmp.Diff(tc.expectedRunNames, runNames); d != "" {
-				t.Errorf("expected to see Run names %v. Diff %s", tc.expectedRunNames, diff.PrintWantGot(d))
 			}
 			if d := cmp.Diff(tc.expectedCustomRunNames, customRunNames); d != "" {
 				t.Errorf("expected to see CustomRun names %v. Diff %s", tc.expectedCustomRunNames, diff.PrintWantGot(d))

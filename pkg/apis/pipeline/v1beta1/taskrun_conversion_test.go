@@ -244,7 +244,7 @@ func TestTaskRunConversion(t *testing.T) {
 							VerificationNoMatchPolicy:        config.DefaultNoMatchPolicyConfig,
 							ResultExtractionMethod:           config.DefaultResultExtractionMethod,
 							MaxResultSize:                    config.DefaultMaxResultSize,
-							CustomTaskVersion:                config.DefaultCustomTaskVersion,
+							//CustomTaskVersion:                config.DefaultCustomTaskVersion,
 						},
 					}},
 			},

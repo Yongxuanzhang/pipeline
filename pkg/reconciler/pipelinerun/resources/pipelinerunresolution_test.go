@@ -27,7 +27,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/tektoncd/pipeline/pkg/apis/config"
-	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1alpha1"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	"github.com/tektoncd/pipeline/pkg/reconciler/pipeline/dag"
 	"github.com/tektoncd/pipeline/pkg/reconciler/taskrun/resources"
@@ -226,20 +225,6 @@ var runs = []v1beta1.CustomRun{{
 	Spec: v1beta1.CustomRunSpec{},
 }}
 
-var v1alpha1Runs = []v1alpha1.Run{{
-	ObjectMeta: metav1.ObjectMeta{
-		Namespace: "namespace",
-		Name:      "pipelinerun-mytask15",
-	},
-	Spec: v1alpha1.RunSpec{},
-}, {
-	ObjectMeta: metav1.ObjectMeta{
-		Namespace: "namespace",
-		Name:      "pipelinerun-mytask16",
-	},
-	Spec: v1alpha1.RunSpec{},
-}}
-
 var matrixedPipelineTask = &v1beta1.PipelineTask{
 	Name: "task",
 	Matrix: &v1beta1.Matrix{
@@ -292,12 +277,6 @@ func makeToBeRetried(tr v1beta1.TaskRun) *v1beta1.TaskRun {
 	return newTr
 }
 
-func makeV1alpha1RunFailed(run v1alpha1.Run) *v1alpha1.Run {
-	newRun := newV1alpha1Run(run)
-	newRun.Status.Conditions[0].Status = corev1.ConditionFalse
-	return newRun
-}
-
 func makeRunFailed(run v1beta1.CustomRun) *v1beta1.CustomRun {
 	newRun := newRun(run)
 	newRun.Status.Conditions[0].Status = corev1.ConditionFalse
@@ -313,11 +292,6 @@ func withCancelledForTimeout(tr *v1beta1.TaskRun) *v1beta1.TaskRun {
 	tr.Spec.StatusMessage = v1beta1.TaskRunCancelledByPipelineTimeoutMsg
 	tr.Status.Conditions[0].Reason = v1beta1.TaskRunSpecStatusCancelled
 	return tr
-}
-
-func withV1alpha1RunCancelled(run *v1alpha1.Run) *v1alpha1.Run {
-	run.Status.Conditions[0].Reason = v1alpha1.RunReasonCancelled.String()
-	return run
 }
 
 func withRunCancelled(run *v1beta1.CustomRun) *v1beta1.CustomRun {
@@ -371,18 +345,6 @@ func withRunRetries(r *v1beta1.CustomRun) *v1beta1.CustomRun {
 	return r
 }
 
-func withV1alpha1RunRetries(r *v1alpha1.Run) *v1alpha1.Run {
-	r.Status.RetriesStatus = []v1alpha1.RunStatus{{
-		Status: duckv1.Status{
-			Conditions: []apis.Condition{{
-				Type:   apis.ConditionSucceeded,
-				Status: corev1.ConditionFalse,
-			}},
-		},
-	}}
-	return r
-}
-
 func newTaskRun(tr v1beta1.TaskRun) *v1beta1.TaskRun {
 	return &v1beta1.TaskRun{
 		ObjectMeta: metav1.ObjectMeta{
@@ -401,21 +363,6 @@ func newTaskRun(tr v1beta1.TaskRun) *v1beta1.TaskRun {
 func withPipelineTaskRetries(pt v1beta1.PipelineTask, retries int) *v1beta1.PipelineTask {
 	pt.Retries = retries
 	return &pt
-}
-
-func newV1alpha1Run(run v1alpha1.Run) *v1alpha1.Run {
-	return &v1alpha1.Run{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: run.Namespace,
-			Name:      run.Name,
-		},
-		Spec: run.Spec,
-		Status: v1alpha1.RunStatus{
-			Status: duckv1.Status{
-				Conditions: []apis.Condition{{Type: apis.ConditionSucceeded}},
-			},
-		},
-	}
 }
 
 func newRun(run v1beta1.CustomRun) *v1beta1.CustomRun {
@@ -1340,30 +1287,14 @@ func TestIsFailure(t *testing.T) {
 			RunObject:    makeRunFailed(runs[0]),
 		},
 		want: true,
-	}, {
-		name: "v1alpha1 run failed: retries remaining",
-		rpt: ResolvedPipelineTask{
-			PipelineTask: &v1beta1.PipelineTask{Name: "task", Retries: 1},
-			CustomTask:   true,
-			RunObject:    makeV1alpha1RunFailed(v1alpha1Runs[0]),
-		},
-		want: false,
-	}, {
+	},{
 		name: "taskrun failed - Retried",
 		rpt: ResolvedPipelineTask{
 			PipelineTask: &v1beta1.PipelineTask{Name: "task", Retries: 1},
 			TaskRun:      withRetries(makeFailed(trs[0])),
 		},
 		want: true,
-	}, {
-		name: "v1alpha1 run failed - Retried",
-		rpt: ResolvedPipelineTask{
-			PipelineTask: &v1beta1.PipelineTask{Name: "task", Retries: 1},
-			CustomTask:   true,
-			RunObject:    withV1alpha1RunRetries(makeV1alpha1RunFailed(v1alpha1Runs[0])),
-		},
-		want: true,
-	}, {
+	},{
 		name: "run failed - Retried",
 		rpt: ResolvedPipelineTask{
 			PipelineTask: &v1beta1.PipelineTask{Name: "task", Retries: 1},
@@ -1423,15 +1354,7 @@ func TestIsFailure(t *testing.T) {
 			TaskRun:      withCancelled(makeFailed(trs[0])),
 		},
 		want: true,
-	}, {
-		name: "v1alpha1 run cancelled: retries remaining",
-		rpt: ResolvedPipelineTask{
-			PipelineTask: &v1beta1.PipelineTask{Name: "task", Retries: 1},
-			RunObject:    withV1alpha1RunCancelled(makeV1alpha1RunFailed(v1alpha1Runs[0])),
-			CustomTask:   true,
-		},
-		want: false,
-	}, {
+	},  {
 		name: "run cancelled: retries remaining",
 		rpt: ResolvedPipelineTask{
 			PipelineTask: &v1beta1.PipelineTask{Name: "task", Retries: 1},
@@ -1557,14 +1480,6 @@ func TestIsFailure(t *testing.T) {
 		},
 		want: true,
 	}, {
-		name: "matrixed v1alpha1 runs failed: retries remaining",
-		rpt: ResolvedPipelineTask{
-			CustomTask:   true,
-			PipelineTask: withPipelineTaskRetries(*matrixedPipelineTask, 1),
-			RunObjects:   []v1beta1.RunObject{makeV1alpha1RunFailed(v1alpha1Runs[0]), makeV1alpha1RunFailed(v1alpha1Runs[1])},
-		},
-		want: false,
-	}, {
 		name: "matrixed runs failed: retries remaining",
 		rpt: ResolvedPipelineTask{
 			CustomTask:   true,
@@ -1662,15 +1577,7 @@ func TestIsFailure(t *testing.T) {
 			TaskRuns:     []*v1beta1.TaskRun{withCancelled(makeFailed(trs[0])), withCancelled(makeFailed(trs[1]))},
 		},
 		want: true,
-	}, {
-		name: "matrixed v1alpha1 runs cancelled: retries remaining",
-		rpt: ResolvedPipelineTask{
-			CustomTask:   true,
-			PipelineTask: withPipelineTaskRetries(*matrixedPipelineTask, 1),
-			RunObjects:   []v1beta1.RunObject{withV1alpha1RunCancelled(makeV1alpha1RunFailed(v1alpha1Runs[0])), withV1alpha1RunCancelled(makeV1alpha1RunFailed(v1alpha1Runs[1]))},
-		},
-		want: false,
-	}, {
+	},{
 		name: "matrixed runs cancelled: retries remaining",
 		rpt: ResolvedPipelineTask{
 			CustomTask:   true,

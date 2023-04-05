@@ -51,7 +51,7 @@ func TestNewFeatureFlagsFromConfigMap(t *testing.T) {
 				EnableProvenanceInStatus:  config.DefaultEnableProvenanceInStatus,
 				ResultExtractionMethod:    config.DefaultResultExtractionMethod,
 				MaxResultSize:             config.DefaultMaxResultSize,
-				CustomTaskVersion:         config.DefaultCustomTaskVersion,
+				//CustomTaskVersion:         config.DefaultCustomTaskVersion,
 			},
 			fileName: config.GetFeatureFlagsConfigName(),
 		},
@@ -69,7 +69,7 @@ func TestNewFeatureFlagsFromConfigMap(t *testing.T) {
 				EnableProvenanceInStatus:         true,
 				ResultExtractionMethod:           "termination-message",
 				MaxResultSize:                    4096,
-				CustomTaskVersion:                "v1beta1",
+				//CustomTaskVersion:                "v1beta1",
 			},
 			fileName: "feature-flags-all-flags-set",
 		},
@@ -89,7 +89,7 @@ func TestNewFeatureFlagsFromConfigMap(t *testing.T) {
 				VerificationNoMatchPolicy:        config.DefaultNoMatchPolicyConfig,
 				ResultExtractionMethod:           config.DefaultResultExtractionMethod,
 				MaxResultSize:                    config.DefaultMaxResultSize,
-				CustomTaskVersion:                config.DefaultCustomTaskVersion,
+				//CustomTaskVersion:                config.DefaultCustomTaskVersion,
 			},
 			fileName: "feature-flags-enable-api-fields-overrides-bundles-and-custom-tasks",
 		},
@@ -107,7 +107,7 @@ func TestNewFeatureFlagsFromConfigMap(t *testing.T) {
 				VerificationNoMatchPolicy:        config.DefaultNoMatchPolicyConfig,
 				ResultExtractionMethod:           config.DefaultResultExtractionMethod,
 				MaxResultSize:                    config.DefaultMaxResultSize,
-				CustomTaskVersion:                config.DefaultCustomTaskVersion,
+				//CustomTaskVersion:                config.DefaultCustomTaskVersion,
 			},
 			fileName: "feature-flags-bundles-and-custom-tasks",
 		},
@@ -125,7 +125,7 @@ func TestNewFeatureFlagsFromConfigMap(t *testing.T) {
 				VerificationNoMatchPolicy:        config.DefaultNoMatchPolicyConfig,
 				ResultExtractionMethod:           config.DefaultResultExtractionMethod,
 				MaxResultSize:                    config.DefaultMaxResultSize,
-				CustomTaskVersion:                config.DefaultCustomTaskVersion,
+				//CustomTaskVersion:                config.DefaultCustomTaskVersion,
 			},
 			fileName: "feature-flags-beta-api-fields",
 		},
@@ -139,7 +139,7 @@ func TestNewFeatureFlagsFromConfigMap(t *testing.T) {
 				AwaitSidecarReadiness:            config.DefaultAwaitSidecarReadiness,
 				ResultExtractionMethod:           config.DefaultResultExtractionMethod,
 				MaxResultSize:                    config.DefaultMaxResultSize,
-				CustomTaskVersion:                config.DefaultCustomTaskVersion,
+				//CustomTaskVersion:                config.DefaultCustomTaskVersion,
 			},
 			fileName: "feature-flags-enforce-nonfalsifiability-spire",
 		},
@@ -151,7 +151,7 @@ func TestNewFeatureFlagsFromConfigMap(t *testing.T) {
 				AwaitSidecarReadiness:            config.DefaultAwaitSidecarReadiness,
 				ResultExtractionMethod:           config.ResultExtractionMethodSidecarLogs,
 				MaxResultSize:                    8192,
-				CustomTaskVersion:                config.DefaultCustomTaskVersion,
+				//CustomTaskVersion:                config.DefaultCustomTaskVersion,
 			},
 			fileName: "feature-flags-results-via-sidecar-logs",
 		},
@@ -182,7 +182,7 @@ func TestNewFeatureFlagsFromEmptyConfigMap(t *testing.T) {
 		EnableProvenanceInStatus:         config.DefaultEnableProvenanceInStatus,
 		ResultExtractionMethod:           config.DefaultResultExtractionMethod,
 		MaxResultSize:                    config.DefaultMaxResultSize,
-		CustomTaskVersion:                config.DefaultCustomTaskVersion,
+		//CustomTaskVersion:                config.DefaultCustomTaskVersion,
 	}
 	verifyConfigFileWithExpectedFeatureFlagsConfig(t, FeatureFlagsConfigEmptyName, expectedConfig)
 }
@@ -229,8 +229,6 @@ func TestNewFeatureFlagsConfigMapErrors(t *testing.T) {
 		fileName: "feature-flags-invalid-max-result-size-too-large",
 	}, {
 		fileName: "feature-flags-invalid-max-result-size-bad-value",
-	}, {
-		fileName: "feature-flags-invalid-custom-task-version",
 	}, {
 		fileName: "feature-flags-enforce-nonfalsifiability-bad-flag",
 	}, {

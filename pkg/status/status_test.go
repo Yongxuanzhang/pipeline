@@ -22,7 +22,6 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1alpha1"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	ttesting "github.com/tektoncd/pipeline/pkg/reconciler/testing"
 	"github.com/tektoncd/pipeline/test"
@@ -172,30 +171,6 @@ status:
 					}},
 				},
 			},
-		}, {
-			name: "success with alpha run",
-			run: parse.MustParseRun(t, `
-metadata:
-  name: some-run
-spec: {}
-status:
-  conditions:
-  - status: "False"
-    type: Succeeded
-`),
-			childRef: v1beta1.ChildStatusReference{
-				TypeMeta:         runtime.TypeMeta{Kind: "Run"},
-				Name:             "some-run",
-				PipelineTaskName: "some-task",
-			},
-			expectedStatus: &v1beta1.CustomRunStatus{
-				Status: duckv1.Status{
-					Conditions: duckv1.Conditions{{
-						Type:   apis.ConditionSucceeded,
-						Status: corev1.ConditionFalse,
-					}},
-				},
-			},
 		},
 	}
 
@@ -207,8 +182,6 @@ status:
 				switch ro := tc.run.(type) {
 				case *v1beta1.CustomRun:
 					d.CustomRuns = []*v1beta1.CustomRun{ro}
-				case *v1alpha1.Run:
-					d.Runs = []*v1alpha1.Run{ro}
 				}
 			}
 			clients, _ := test.SeedTestData(t, ctx, d)
@@ -263,21 +236,6 @@ status:
     value: rab
 `)
 
-	run2 := parse.MustParseRun(t, `
-metadata:
-  name: pr-run-2
-spec: {}
-status:
-  conditions:
-  - status: "True"
-    type: Succeeded
-  results:
-  - name: foo
-    value: oof
-  - name: bar
-    value: rab
-`)
-
 	testCases := []struct {
 		name                string
 		originalPR          *v1beta1.PipelineRun
@@ -310,10 +268,6 @@ status:
     kind: CustomRun
     name: pr-run-1
     pipelineTaskName: run-1
-  - apiVersion: tekton.dev/v1alpha1
-    kind: Run
-    name: pr-run-2
-    pipelineTaskName: run-2
   conditions:
   - message: Not all Tasks in the Pipeline have finished executing
     reason: Running
@@ -321,7 +275,7 @@ status:
     type: Succeeded
 `),
 			taskRuns: []*v1beta1.TaskRun{tr1},
-			runs:     []v1beta1.RunObject{customRun1, run2},
+			runs:     []v1beta1.RunObject{customRun1},
 			expectedTRStatuses: mustParseTaskRunStatusMap(t, `
 pr-task-1:
   pipelineTaskName: task-1
@@ -336,17 +290,6 @@ pr-task-1:
 			expectedRunStatuses: mustParseRunStatusMap(t, `
 pr-run-1:
   pipelineTaskName: run-1
-  status:
-    conditions:
-    - status: "True"
-      type: Succeeded
-    results:
-    - name: foo
-      value: oof
-    - name: bar
-      value: rab
-pr-run-2:
-  pipelineTaskName: run-2
   status:
     conditions:
     - status: "True"
@@ -417,8 +360,6 @@ pr-run-1:
 					switch ro := r.(type) {
 					case *v1beta1.CustomRun:
 						d.CustomRuns = append(d.CustomRuns, ro)
-					case *v1alpha1.Run:
-						d.Runs = append(d.Runs, ro)
 					}
 				}
 			}

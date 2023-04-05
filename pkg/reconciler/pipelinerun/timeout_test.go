@@ -18,7 +18,6 @@ import (
 	"testing"
 
 	"github.com/tektoncd/pipeline/pkg/apis/config"
-	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1alpha1"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	_ "github.com/tektoncd/pipeline/pkg/pipelinerunmetrics/fake" // Make sure the pipelinerunmetrics are setup
 	ttesting "github.com/tektoncd/pipeline/pkg/reconciler/testing"
@@ -31,13 +30,11 @@ import (
 
 func TestTimeoutPipelineRun(t *testing.T) {
 	testCases := []struct {
-		name                  string
-		useV1Beta1CustomTasks bool
-		pipelineRun           *v1beta1.PipelineRun
-		taskRuns              []*v1beta1.TaskRun
-		customRuns            []*v1beta1.CustomRun
-		runs                  []*v1alpha1.Run
-		wantErr               bool
+		name        string
+		pipelineRun *v1beta1.PipelineRun
+		taskRuns    []*v1beta1.TaskRun
+		customRuns  []*v1beta1.CustomRun
+		wantErr     bool
 	}{{
 		name: "no-resolved-taskrun",
 		pipelineRun: &v1beta1.PipelineRun{
@@ -103,8 +100,7 @@ func TestTimeoutPipelineRun(t *testing.T) {
 			{ObjectMeta: metav1.ObjectMeta{Name: "t2"}},
 		},
 	}, {
-		name:                  "multiple-runs-beta-custom-tasks",
-		useV1Beta1CustomTasks: true,
+		name: "multiple-runs-beta-custom-tasks",
 		pipelineRun: &v1beta1.PipelineRun{
 			ObjectMeta: metav1.ObjectMeta{Name: "test-pipeline-run-timedout"},
 			Spec:       v1beta1.PipelineRunSpec{},
@@ -125,52 +121,7 @@ func TestTimeoutPipelineRun(t *testing.T) {
 			{ObjectMeta: metav1.ObjectMeta{Name: "t2"}},
 		},
 	}, {
-		name: "multiple-taskruns-and-runs",
-		pipelineRun: &v1beta1.PipelineRun{
-			ObjectMeta: metav1.ObjectMeta{Name: "test-pipeline-run-timedout"},
-			Spec:       v1beta1.PipelineRunSpec{},
-			Status: v1beta1.PipelineRunStatus{PipelineRunStatusFields: v1beta1.PipelineRunStatusFields{
-				ChildReferences: []v1beta1.ChildStatusReference{
-					{
-						TypeMeta:         runtime.TypeMeta{Kind: taskRun},
-						Name:             "t1",
-						PipelineTaskName: "task-1",
-					},
-					{
-						TypeMeta:         runtime.TypeMeta{Kind: taskRun},
-						Name:             "t2",
-						PipelineTaskName: "task-2",
-					},
-					{
-						TypeMeta: runtime.TypeMeta{
-							APIVersion: v1alpha1.SchemeGroupVersion.String(),
-							Kind:       run,
-						},
-						Name:             "r1",
-						PipelineTaskName: "run-1",
-					},
-					{
-						TypeMeta: runtime.TypeMeta{
-							APIVersion: v1alpha1.SchemeGroupVersion.String(),
-							Kind:       run,
-						},
-						Name:             "r2",
-						PipelineTaskName: "run-2",
-					},
-				},
-			}},
-		},
-		taskRuns: []*v1beta1.TaskRun{
-			{ObjectMeta: metav1.ObjectMeta{Name: "t1"}},
-			{ObjectMeta: metav1.ObjectMeta{Name: "t2"}},
-		},
-		runs: []*v1alpha1.Run{
-			{ObjectMeta: metav1.ObjectMeta{Name: "r1"}},
-			{ObjectMeta: metav1.ObjectMeta{Name: "r2"}},
-		},
-	}, {
-		name:                  "child-references-beta-custom-tasks",
-		useV1Beta1CustomTasks: true,
+		name: "child-references-beta-custom-tasks",
 		pipelineRun: &v1beta1.PipelineRun{
 			ObjectMeta: metav1.ObjectMeta{Name: "test-pipeline-run-timedout"},
 			Spec:       v1beta1.PipelineRunSpec{},
@@ -235,14 +186,10 @@ func TestTimeoutPipelineRun(t *testing.T) {
 				PipelineRuns: []*v1beta1.PipelineRun{tc.pipelineRun},
 				TaskRuns:     tc.taskRuns,
 				CustomRuns:   tc.customRuns,
-				Runs:         tc.runs,
 			}
 			ctx, _ := ttesting.SetupFakeContext(t)
 			cfg := config.NewStore(logtesting.TestLogger(t))
 			cm := newFeatureFlagsConfigMap()
-			if tc.useV1Beta1CustomTasks {
-				cm = withCustomTaskVersion(cm, config.CustomTaskVersionBeta)
-			}
 			cfg.OnConfigChanged(cm)
 			ctx = cfg.ToContext(ctx)
 			ctx, cancel := context.WithCancel(ctx)
@@ -287,20 +234,6 @@ func TestTimeoutPipelineRun(t *testing.T) {
 							t.Errorf("expected task %q to be marked as cancelled, was %q", r.Name, r.Spec.Status)
 						}
 						if r.Spec.StatusMessage != v1beta1.CustomRunCancelledByPipelineTimeoutMsg {
-							t.Errorf("expected run %s to have the timeout-specific status message, was %s", r.Name, r.Spec.StatusMessage)
-						}
-					}
-				}
-				if tc.runs != nil {
-					for _, expectedRun := range tc.runs {
-						r, err := c.Pipeline.TektonV1alpha1().Runs("").Get(ctx, expectedRun.Name, metav1.GetOptions{})
-						if err != nil {
-							t.Fatalf("couldn't get expected Run %s, got error %s", expectedRun.Name, err)
-						}
-						if r.Spec.Status != v1alpha1.RunSpecStatusCancelled {
-							t.Errorf("expected task %q to be marked as cancelled, was %q", r.Name, r.Spec.Status)
-						}
-						if r.Spec.StatusMessage != v1alpha1.RunCancelledByPipelineTimeoutMsg {
 							t.Errorf("expected run %s to have the timeout-specific status message, was %s", r.Name, r.Spec.StatusMessage)
 						}
 					}

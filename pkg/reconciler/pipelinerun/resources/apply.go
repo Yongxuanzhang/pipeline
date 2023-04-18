@@ -186,7 +186,10 @@ func ApplyTaskResults(targets PipelineRunState, resolvedResultRefs ResolvedResul
 			if pipelineTask.IsMatrixed() {
 				// Only string replacements from string, array or object results are supported
 				// We plan to support array replacements from array results soon (#5925)
-				pipelineTask.Matrix.Params = replaceParamValues(pipelineTask.Matrix.Params, stringReplacements, nil, nil)
+				fmt.Println("!!!!arrayReplacements", arrayReplacements)
+				fmt.Println("!!!!pipelineTask.Matrix.Params 1", pipelineTask.Matrix.Params)
+				pipelineTask.Matrix.Params = replaceParamValues(pipelineTask.Matrix.Params, stringReplacements, arrayReplacements, nil)
+				fmt.Println("!!!!pipelineTask.Matrix.Params 2", pipelineTask.Matrix.Params)
 				for i := range pipelineTask.Matrix.Include {
 					// matrix include parameters can only be type string
 					pipelineTask.Matrix.Include[i].Params = replaceParamValues(pipelineTask.Matrix.Include[i].Params, stringReplacements, nil, nil)

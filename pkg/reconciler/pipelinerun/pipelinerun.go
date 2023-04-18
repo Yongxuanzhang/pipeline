@@ -352,6 +352,7 @@ func (c *Reconciler) resolvePipelineState(
 			},
 			getRunObjectFunc,
 			task,
+			pst,
 		)
 		if err != nil {
 			if tresources.IsGetTaskErrTransient(err) {

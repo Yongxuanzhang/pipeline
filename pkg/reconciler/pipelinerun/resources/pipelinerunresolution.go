@@ -574,6 +574,7 @@ func ResolvePipelineTask(
 	getTaskRun resources.GetTaskRun,
 	getRun GetRun,
 	pipelineTask v1beta1.PipelineTask,
+	pst PipelineRunState,
 ) (*ResolvedPipelineTask, error) {
 	rpt := ResolvedPipelineTask{
 		PipelineTask: &pipelineTask,
@@ -601,7 +602,12 @@ func ResolvePipelineTask(
 			rpt.RunObject = run
 		}
 	case rpt.PipelineTask.IsMatrixed():
-		rpt.TaskRunNames = GetNamesOfTaskRuns(pipelineRun.Status.ChildReferences, pipelineTask.Name, pipelineRun.Name, pipelineTask.Matrix.CountCombinations())
+		resolvedResultRefs, _, _ := ResolveResultRefs(pst, PipelineRunState{&rpt})
+		fmt.Println("!!!ResolvePipelineTask resolvedResultRefs", resolvedResultRefs)
+		fmt.Println("!!!ResolvePipelineTask rpt", rpt)
+		ApplyTaskResults(PipelineRunState{&rpt},resolvedResultRefs)
+		fmt.Println("!!! pipelineTask.Matrix.CountCombinations()",rpt.PipelineTask.Matrix.CountCombinations())
+		rpt.TaskRunNames = GetNamesOfTaskRuns(pipelineRun.Status.ChildReferences, pipelineTask.Name, pipelineRun.Name, rpt.PipelineTask.Matrix.CountCombinations())
 		for _, taskRunName := range rpt.TaskRunNames {
 			if err := rpt.resolvePipelineRunTaskWithTaskRun(ctx, taskRunName, getTask, getTaskRun, pipelineTask); err != nil {
 				return nil, err

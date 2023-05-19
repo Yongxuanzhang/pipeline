@@ -46,8 +46,8 @@ import (
 func nopGetRun(string) (v1beta1.RunObject, error) {
 	return nil, errors.New("GetRun should not be called")
 }
-func nopGetTask(context.Context, string) (*v1beta1.Task, *v1beta1.RefSource, error) {
-	return nil, nil, errors.New("GetTask should not be called")
+func nopGetTask(context.Context, string) (*v1beta1.Task, *v1beta1.RefSource, *trustedresources.VerificationResult, error) {
+	return nil, nil, nil, errors.New("GetTask should not be called")
 }
 func nopGetTaskRun(string) (*v1beta1.TaskRun, error) {
 	return nil, errors.New("GetTaskRun should not be called")
@@ -2273,8 +2273,8 @@ func TestResolvePipelineRun_PipelineTaskHasNoResources(t *testing.T) {
 		TaskRef: &v1beta1.TaskRef{Name: "task"},
 	}}
 
-	getTask := func(ctx context.Context, name string) (*v1beta1.Task, *v1beta1.RefSource, error) {
-		return task, nil, nil
+	getTask := func(ctx context.Context, name string) (*v1beta1.Task, *v1beta1.RefSource, *trustedresources.VerificationResult, error) {
+		return task, nil, nil, nil
 	}
 	getTaskRun := func(name string) (*v1beta1.TaskRun, error) { return &trs[0], nil }
 	pr := v1beta1.PipelineRun{
@@ -2323,8 +2323,8 @@ func TestResolvePipelineRun_TaskDoesntExist(t *testing.T) {
 		}}}
 
 	// Return an error when the Task is retrieved, as if it didn't exist
-	getTask := func(ctx context.Context, name string) (*v1beta1.Task, *v1beta1.RefSource, error) {
-		return nil, nil, kerrors.NewNotFound(v1beta1.Resource("task"), name)
+	getTask := func(ctx context.Context, name string) (*v1beta1.Task, *v1beta1.RefSource, *trustedresources.VerificationResult, error) {
+		return nil, nil, nil, kerrors.NewNotFound(v1beta1.Resource("task"), name)
 	}
 	getTaskRun := func(name string) (*v1beta1.TaskRun, error) {
 		return nil, kerrors.NewNotFound(v1beta1.Resource("taskrun"), name)
@@ -2364,9 +2364,9 @@ func TestResolvePipelineRun_VerificationFailed(t *testing.T) {
 				Value: *v1beta1.NewStructuredValues("b", "a", "r"),
 			}},
 		}}}
-
-	getTask := func(ctx context.Context, name string) (*v1beta1.Task, *v1beta1.RefSource, error) {
-		return nil, nil, trustedresources.ErrResourceVerificationFailed
+	verificationResult := &trustedresources.VerificationResult{VerificationResultType: trustedresources.VerificationError, Err: trustedresources.ErrResourceVerificationFailed}
+	getTask := func(ctx context.Context, name string) (*v1beta1.Task, *v1beta1.RefSource, *trustedresources.VerificationResult, error) {
+		return task, nil, verificationResult, nil
 	}
 	getTaskRun := func(name string) (*v1beta1.TaskRun, error) { return nil, nil } //nolint:nilnil
 	pr := v1beta1.PipelineRun{
@@ -2375,12 +2375,9 @@ func TestResolvePipelineRun_VerificationFailed(t *testing.T) {
 		},
 	}
 	for _, pt := range pts {
-		_, err := ResolvePipelineTask(context.Background(), pr, getTask, getTaskRun, nopGetRun, pt)
-		if err == nil {
-			t.Errorf("expected to get err but got nil")
-		}
-		if !errors.Is(err, trustedresources.ErrResourceVerificationFailed) {
-			t.Errorf("expected to get %v but got %v", trustedresources.ErrResourceVerificationFailed, err)
+		rt, _ := ResolvePipelineTask(context.Background(), pr, getTask, getTaskRun, nopGetRun, pt)
+		if d := cmp.Diff(verificationResult, rt.ResolvedTask.VerificationResult, cmpopts.EquateErrors()); d != "" {
+			t.Errorf(diff.PrintWantGot(d))
 		}
 	}
 }
@@ -2602,8 +2599,8 @@ func TestResolvePipeline_WhenExpressions(t *testing.T) {
 		WhenExpressions: []v1beta1.WhenExpression{ptwe1},
 	}
 
-	getTask := func(_ context.Context, name string) (*v1beta1.Task, *v1beta1.RefSource, error) {
-		return task, nil, nil
+	getTask := func(_ context.Context, name string) (*v1beta1.Task, *v1beta1.RefSource, *trustedresources.VerificationResult, error) {
+		return task, nil, nil, nil
 	}
 	pr := v1beta1.PipelineRun{
 		ObjectMeta: metav1.ObjectMeta{
@@ -2635,8 +2632,8 @@ func TestIsCustomTask(t *testing.T) {
 			Name: "pipelinerun",
 		},
 	}
-	getTask := func(ctx context.Context, name string) (*v1beta1.Task, *v1beta1.RefSource, error) {
-		return task, nil, nil
+	getTask := func(ctx context.Context, name string) (*v1beta1.Task, *v1beta1.RefSource, *trustedresources.VerificationResult, error) {
+		return task, nil, nil, nil
 	}
 	getTaskRun := func(name string) (*v1beta1.TaskRun, error) { return nil, nil } //nolint:nilnil
 	getRun := func(name string) (v1beta1.RunObject, error) { return nil, nil }
@@ -3402,8 +3399,8 @@ func TestIsMatrixed(t *testing.T) {
 			Name: "pipelinerun",
 		},
 	}
-	getTask := func(ctx context.Context, name string) (*v1beta1.Task, *v1beta1.RefSource, error) {
-		return task, nil, nil
+	getTask := func(ctx context.Context, name string) (*v1beta1.Task, *v1beta1.RefSource, *trustedresources.VerificationResult, error) {
+		return task, nil, nil, nil
 	}
 	getTaskRun := func(name string) (*v1beta1.TaskRun, error) { return &trs[0], nil }
 	getRun := func(name string) (v1beta1.RunObject, error) { return &customRuns[0], nil }
@@ -3536,8 +3533,8 @@ func TestResolvePipelineRunTask_WithMatrix(t *testing.T) {
 		}}},
 	}
 
-	getTask := func(ctx context.Context, name string) (*v1beta1.Task, *v1beta1.RefSource, error) {
-		return task, nil, nil
+	getTask := func(ctx context.Context, name string) (*v1beta1.Task, *v1beta1.RefSource, *trustedresources.VerificationResult, error) {
+		return task, nil, nil, nil
 	}
 	getTaskRun := func(name string) (*v1beta1.TaskRun, error) { return taskRunsMap[name], nil }
 	getRun := func(name string) (v1beta1.RunObject, error) { return &customRuns[0], nil }
@@ -3640,8 +3637,8 @@ func TestResolvePipelineRunTask_WithMatrixedCustomTask(t *testing.T) {
 			}}},
 	}}
 
-	getTask := func(ctx context.Context, name string) (*v1beta1.Task, *v1beta1.RefSource, error) {
-		return task, nil, nil
+	getTask := func(ctx context.Context, name string) (*v1beta1.Task, *v1beta1.RefSource, *trustedresources.VerificationResult, error) {
+		return task, nil, nil, nil
 	}
 	getTaskRun := func(name string) (*v1beta1.TaskRun, error) { return &trs[0], nil }
 	getRun := func(name string) (v1beta1.RunObject, error) { return runsMap[name], nil }

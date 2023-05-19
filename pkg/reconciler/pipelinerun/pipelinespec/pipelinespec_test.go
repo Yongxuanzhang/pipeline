@@ -22,9 +22,11 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	cfgtesting "github.com/tektoncd/pipeline/pkg/apis/config/testing"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	pipelinespec "github.com/tektoncd/pipeline/pkg/reconciler/pipelinerun/pipelinespec"
+	"github.com/tektoncd/pipeline/pkg/trustedresources"
 	"github.com/tektoncd/pipeline/test/diff"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -53,10 +55,10 @@ func TestGetPipelineSpec_Ref(t *testing.T) {
 			},
 		},
 	}
-	gt := func(ctx context.Context, n string) (*v1beta1.Pipeline, *v1beta1.RefSource, error) {
-		return pipeline, nil, nil
+	gt := func(ctx context.Context, n string) (*v1beta1.Pipeline, *v1beta1.RefSource, *trustedresources.VerificationResult, error) {
+		return pipeline, nil, nil, nil
 	}
-	resolvedObjectMeta, pipelineSpec, err := pipelinespec.GetPipelineData(context.Background(), pr, gt)
+	resolvedObjectMeta, pipelineSpec, _, err := pipelinespec.GetPipelineData(context.Background(), pr, gt)
 
 	if err != nil {
 		t.Fatalf("Did not expect error getting pipeline spec but got: %s", err)
@@ -91,10 +93,10 @@ func TestGetPipelineSpec_Embedded(t *testing.T) {
 			},
 		},
 	}
-	gt := func(ctx context.Context, n string) (*v1beta1.Pipeline, *v1beta1.RefSource, error) {
-		return nil, nil, errors.New("shouldn't be called")
+	gt := func(ctx context.Context, n string) (*v1beta1.Pipeline, *v1beta1.RefSource, *trustedresources.VerificationResult, error) {
+		return nil, nil, nil, errors.New("shouldn't be called")
 	}
-	resolvedObjectMeta, pipelineSpec, err := pipelinespec.GetPipelineData(context.Background(), pr, gt)
+	resolvedObjectMeta, pipelineSpec, _, err := pipelinespec.GetPipelineData(context.Background(), pr, gt)
 
 	if err != nil {
 		t.Fatalf("Did not expect error getting pipeline spec but got: %s", err)
@@ -119,10 +121,10 @@ func TestGetPipelineSpec_Invalid(t *testing.T) {
 			Name: "mypipelinerun",
 		},
 	}
-	gt := func(ctx context.Context, n string) (*v1beta1.Pipeline, *v1beta1.RefSource, error) {
-		return nil, nil, errors.New("shouldn't be called")
+	gt := func(ctx context.Context, n string) (*v1beta1.Pipeline, *v1beta1.RefSource, *trustedresources.VerificationResult, error) {
+		return nil, nil, nil, errors.New("shouldn't be called")
 	}
-	_, _, err := pipelinespec.GetPipelineData(context.Background(), tr, gt)
+	_, _, _, err := pipelinespec.GetPipelineData(context.Background(), tr, gt)
 	if err == nil {
 		t.Fatalf("Expected error resolving spec with no embedded or referenced pipeline spec but didn't get error")
 	}
@@ -217,14 +219,14 @@ func TestGetPipelineData_ResolutionSuccess(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := cfgtesting.SetDefaults(context.Background(), t, tc.defaults)
-			getPipeline := func(ctx context.Context, n string) (*v1beta1.Pipeline, *v1beta1.RefSource, error) {
+			getPipeline := func(ctx context.Context, n string) (*v1beta1.Pipeline, *v1beta1.RefSource, *trustedresources.VerificationResult, error) {
 				return &v1beta1.Pipeline{
 					ObjectMeta: *tc.sourceMeta.DeepCopy(),
 					Spec:       *tc.sourceSpec.DeepCopy(),
-				}, tc.refSource.DeepCopy(), nil
+				}, tc.refSource.DeepCopy(), nil, nil
 			}
 
-			resolvedObjectMeta, resolvedPipelineSpec, err := pipelinespec.GetPipelineData(ctx, tc.pr, getPipeline)
+			resolvedObjectMeta, resolvedPipelineSpec, _, err := pipelinespec.GetPipelineData(ctx, tc.pr, getPipeline)
 			if err != nil {
 				t.Fatalf("did not expect error getting pipeline spec but got: %s", err)
 			}
@@ -253,10 +255,10 @@ func TestGetPipelineSpec_Error(t *testing.T) {
 			},
 		},
 	}
-	gt := func(ctx context.Context, n string) (*v1beta1.Pipeline, *v1beta1.RefSource, error) {
-		return nil, nil, errors.New("something went wrong")
+	gt := func(ctx context.Context, n string) (*v1beta1.Pipeline, *v1beta1.RefSource, *trustedresources.VerificationResult, error) {
+		return nil, nil, nil, errors.New("something went wrong")
 	}
-	_, _, err := pipelinespec.GetPipelineData(context.Background(), tr, gt)
+	_, _, _, err := pipelinespec.GetPipelineData(context.Background(), tr, gt)
 	if err == nil {
 		t.Fatalf("Expected error when unable to find referenced Pipeline but got none")
 	}
@@ -275,11 +277,11 @@ func TestGetPipelineData_ResolutionError(t *testing.T) {
 			},
 		},
 	}
-	getPipeline := func(ctx context.Context, n string) (*v1beta1.Pipeline, *v1beta1.RefSource, error) {
-		return nil, nil, errors.New("something went wrong")
+	getPipeline := func(ctx context.Context, n string) (*v1beta1.Pipeline, *v1beta1.RefSource, *trustedresources.VerificationResult, error) {
+		return nil, nil, nil, errors.New("something went wrong")
 	}
 	ctx := context.Background()
-	_, _, err := pipelinespec.GetPipelineData(ctx, pr, getPipeline)
+	_, _, _, err := pipelinespec.GetPipelineData(ctx, pr, getPipeline)
 	if err == nil {
 		t.Fatalf("Expected error when unable to find referenced Pipeline but got none")
 	}
@@ -298,12 +300,50 @@ func TestGetPipelineData_ResolvedNilPipeline(t *testing.T) {
 			},
 		},
 	}
-	getPipeline := func(ctx context.Context, n string) (*v1beta1.Pipeline, *v1beta1.RefSource, error) {
-		return nil, nil, nil
+	getPipeline := func(ctx context.Context, n string) (*v1beta1.Pipeline, *v1beta1.RefSource, *trustedresources.VerificationResult, error) {
+		return nil, nil, nil, nil
 	}
 	ctx := context.Background()
-	_, _, err := pipelinespec.GetPipelineData(ctx, pr, getPipeline)
+	_, _, _, err := pipelinespec.GetPipelineData(ctx, pr, getPipeline)
 	if err == nil {
 		t.Fatalf("Expected error when unable to find referenced Pipeline but got none")
+	}
+}
+
+func TestGetTaskData_VerificationResult(t *testing.T) {
+	pipeline := &v1beta1.Pipeline{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "orchestrate",
+		},
+		Spec: v1beta1.PipelineSpec{
+			Tasks: []v1beta1.PipelineTask{{
+				Name: "mytask",
+				TaskRef: &v1beta1.TaskRef{
+					Name: "mytask",
+				},
+			}},
+		},
+	}
+	pr := &v1beta1.PipelineRun{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "mypipelinerun",
+		},
+		Spec: v1beta1.PipelineRunSpec{
+			PipelineRef: &v1beta1.PipelineRef{
+				Name: "orchestrate",
+			},
+		},
+	}
+
+	verificationResult := &trustedresources.VerificationResult{
+		VerificationResultType: trustedresources.VerificationError,
+		Err:                    trustedresources.ErrResourceVerificationFailed,
+	}
+	gp := func(ctx context.Context, n string) (*v1beta1.Pipeline, *v1beta1.RefSource, *trustedresources.VerificationResult, error) {
+		return pipeline, nil, verificationResult, nil
+	}
+	_, _, vr, _ := pipelinespec.GetPipelineData(context.Background(), pr, gp)
+	if d := cmp.Diff(verificationResult, vr, cmpopts.EquateErrors()); d != "" {
+		t.Errorf(diff.PrintWantGot(d))
 	}
 }

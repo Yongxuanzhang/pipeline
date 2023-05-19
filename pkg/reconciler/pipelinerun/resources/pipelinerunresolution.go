@@ -26,7 +26,6 @@ import (
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	"github.com/tektoncd/pipeline/pkg/reconciler/taskrun/resources"
 	"github.com/tektoncd/pipeline/pkg/remote"
-	"github.com/tektoncd/pipeline/pkg/trustedresources"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	"knative.dev/pkg/apis"
 	"knative.dev/pkg/kmeta"
@@ -565,7 +564,8 @@ func ResolvePipelineTask(
 	} else {
 		rpt.TaskRunNames = GetNamesOfTaskRuns(pipelineRun.Status.ChildReferences, pipelineTask.Name, pipelineRun.Name, numCombinations)
 		for _, taskRunName := range rpt.TaskRunNames {
-			if err := rpt.setTaskRunsAndResolvedTask(ctx, taskRunName, getTask, getTaskRun, pipelineTask); err != nil {
+			err := rpt.setTaskRunsAndResolvedTask(ctx, taskRunName, getTask, getTaskRun, pipelineTask)
+			if err != nil {
 				return nil, err
 			}
 		}
@@ -620,11 +620,9 @@ func resolveTask(
 		} else {
 			// Following minimum status principle (TEP-0100), no need to propagate the RefSource about PipelineTask up to PipelineRun status.
 			// Instead, the child TaskRun's status will be the place recording the RefSource of individual task.
-			t, _, err := getTask(ctx, pipelineTask.TaskRef.Name)
+			t, _, vr, err := getTask(ctx, pipelineTask.TaskRef.Name)
 			switch {
 			case errors.Is(err, remote.ErrRequestInProgress):
-				return rt, err
-			case errors.Is(err, trustedresources.ErrResourceVerificationFailed):
 				return rt, err
 			case err != nil:
 				return rt, &TaskNotFoundError{
@@ -635,6 +633,7 @@ func resolveTask(
 				spec := t.TaskSpec()
 				rt.TaskSpec = &spec
 				rt.TaskName = t.TaskMetadata().Name
+				rt.VerificationResult = vr
 			}
 		}
 		rt.Kind = pipelineTask.TaskRef.Kind

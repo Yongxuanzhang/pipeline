@@ -23,19 +23,22 @@ import (
 
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	resolutionutil "github.com/tektoncd/pipeline/pkg/internal/resolution"
+	"github.com/tektoncd/pipeline/pkg/trustedresources"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // ResolvedTask contains the data that is needed to execute
 // the TaskRun.
 type ResolvedTask struct {
-	TaskName string
-	Kind     v1beta1.TaskKind
-	TaskSpec *v1beta1.TaskSpec
+	TaskName           string
+	Kind               v1beta1.TaskKind
+	TaskSpec           *v1beta1.TaskSpec
+	VerificationResult *trustedresources.VerificationResult
 }
 
 // GetTask is a function used to retrieve Tasks.
-type GetTask func(context.Context, string) (*v1beta1.Task, *v1beta1.RefSource, error)
+// VerificationResult is the result from trusted resources if the feature is enabled.
+type GetTask func(context.Context, string) (*v1beta1.Task, *v1beta1.RefSource, *trustedresources.VerificationResult, error)
 
 // GetTaskRun is a function used to retrieve TaskRuns
 type GetTaskRun func(string) (*v1beta1.TaskRun, error)
@@ -43,44 +46,47 @@ type GetTaskRun func(string) (*v1beta1.TaskRun, error)
 // GetTaskData will retrieve the Task metadata and Spec associated with the
 // provided TaskRun. This can come from a reference Task or from the TaskRun's
 // metadata and embedded TaskSpec.
-func GetTaskData(ctx context.Context, taskRun *v1beta1.TaskRun, getTask GetTask) (*resolutionutil.ResolvedObjectMeta, *v1beta1.TaskSpec, error) {
+func GetTaskData(ctx context.Context, taskRun *v1beta1.TaskRun, getTask GetTask) (*resolutionutil.ResolvedObjectMeta, *v1beta1.TaskSpec, *trustedresources.VerificationResult, error) {
 	taskMeta := metav1.ObjectMeta{}
-	var refSource *v1beta1.RefSource
 	taskSpec := v1beta1.TaskSpec{}
+	var refSource *v1beta1.RefSource
+	var verificationResult *trustedresources.VerificationResult
 	switch {
 	case taskRun.Spec.TaskRef != nil && taskRun.Spec.TaskRef.Name != "":
 		// Get related task for taskrun
-		t, source, err := getTask(ctx, taskRun.Spec.TaskRef.Name)
+		t, source, vr, err := getTask(ctx, taskRun.Spec.TaskRef.Name)
 		if err != nil {
-			return nil, nil, fmt.Errorf("error when listing tasks for taskRun %s: %w", taskRun.Name, err)
+			return nil, nil, nil, fmt.Errorf("error when listing tasks for taskRun %s: %w", taskRun.Name, err)
 		}
 		taskMeta = t.TaskMetadata()
 		taskSpec = t.TaskSpec()
 		refSource = source
+		verificationResult = vr
 	case taskRun.Spec.TaskSpec != nil:
 		taskMeta = taskRun.ObjectMeta
 		taskSpec = *taskRun.Spec.TaskSpec
 		// TODO: if we want to set RefSource for embedded taskspec, set it here.
 		// https://github.com/tektoncd/pipeline/issues/5522
 	case taskRun.Spec.TaskRef != nil && taskRun.Spec.TaskRef.Resolver != "":
-		task, source, err := getTask(ctx, taskRun.Name)
+		task, source, vr, err := getTask(ctx, taskRun.Name)
 		switch {
 		case err != nil:
-			return nil, nil, err
+			return nil, nil, nil, err
 		case task == nil:
-			return nil, nil, errors.New("resolution of remote resource completed successfully but no task was returned")
+			return nil, nil, nil, errors.New("resolution of remote resource completed successfully but no task was returned")
 		default:
 			taskMeta = task.TaskMetadata()
 			taskSpec = task.TaskSpec()
 		}
 		refSource = source
+		verificationResult = vr
 	default:
-		return nil, nil, fmt.Errorf("taskRun %s not providing TaskRef or TaskSpec", taskRun.Name)
+		return nil, nil, nil, fmt.Errorf("taskRun %s not providing TaskRef or TaskSpec", taskRun.Name)
 	}
 
 	taskSpec.SetDefaults(ctx)
 	return &resolutionutil.ResolvedObjectMeta{
 		ObjectMeta: &taskMeta,
 		RefSource:  refSource,
-	}, &taskSpec, nil
+	}, &taskSpec, verificationResult, nil
 }

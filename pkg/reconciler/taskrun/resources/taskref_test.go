@@ -17,7 +17,10 @@
 package resources_test
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -28,7 +31,9 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-containerregistry/pkg/registry"
+	"github.com/sigstore/sigstore/pkg/signature"
 	"github.com/tektoncd/pipeline/pkg/apis/config"
+	pipelinev1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1alpha1"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
 	"github.com/tektoncd/pipeline/pkg/client/clientset/versioned/fake"
@@ -83,6 +88,24 @@ var (
 		},
 		EntryPoint: "foo/bar",
 	}
+	unsignedV1Task = pipelinev1.Task{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "tekton.dev/v1",
+			Kind:       "Task"},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        "task",
+			Annotations: map[string]string{"foo": "bar"},
+		},
+		Spec: pipelinev1.TaskSpec{
+			Steps: []pipelinev1.Step{{
+				Image: "ubuntu",
+				Name:  "echo",
+			}},
+		},
+	}
+	verificationResultCmp = cmp.Comparer(func(x, y trustedresources.VerificationResult) bool {
+		return x.VerificationResultType == y.VerificationResultType && (errors.Is(x.Err, y.Err) || errors.Is(y.Err, x.Err))
+	})
 )
 
 func TestGetTaskKind(t *testing.T) {
@@ -1016,6 +1039,288 @@ func TestGetTaskFunc_VerifyError(t *testing.T) {
 	}
 }
 
+func TestGetTaskFunc_V1Task_VerifyNoError(t *testing.T) {
+	ctx := context.Background()
+	signer, _, k8sclient, vps := test.SetupVerificationPolicies(t)
+	tektonclient := fake.NewSimpleClientset()
+
+	v1beta1UnsignedTask := &v1beta1.Task{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Task",
+			APIVersion: "tekton.dev/v1beta1",
+		},
+	}
+	if err := v1beta1UnsignedTask.ConvertFrom(ctx, unsignedV1Task.DeepCopy()); err != nil {
+		t.Error(err)
+	}
+
+	unsignedTaskBytes, err := json.Marshal(unsignedV1Task)
+	if err != nil {
+		t.Fatal("fail to marshal task", err)
+	}
+	noMatchPolicyRefSource := &v1beta1.RefSource{
+		URI: "abc.com",
+		Digest: map[string]string{
+			"sha1": "a123",
+		},
+		EntryPoint: "foo/bar",
+	}
+	resolvedUnmatched := test.NewResolvedResource(unsignedTaskBytes, nil, noMatchPolicyRefSource, nil)
+	requesterUnmatched := test.NewRequester(resolvedUnmatched, nil)
+
+	signedV1Task, err := getSignedV1Task(unsignedV1Task.DeepCopy(), signer, "signed")
+	if err != nil {
+		t.Fatal("fail to sign task", err)
+	}
+
+	v1beta1SignedTask := &v1beta1.Task{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Task",
+			APIVersion: "tekton.dev/v1beta1",
+		},
+	}
+	if err := v1beta1SignedTask.ConvertFrom(ctx, signedV1Task.DeepCopy()); err != nil {
+		t.Error(err)
+	}
+
+	signedTaskBytes, err := json.Marshal(signedV1Task)
+	if err != nil {
+		t.Fatal("fail to marshal task", err)
+	}
+	matchPolicyRefSource := &v1beta1.RefSource{
+		URI: "	https://github.com/tektoncd/catalog.git",
+		Digest: map[string]string{
+			"sha1": "a123",
+		},
+		EntryPoint: "foo/bar",
+	}
+	resolvedMatched := test.NewResolvedResource(signedTaskBytes, nil, matchPolicyRefSource, nil)
+	requesterMatched := test.NewRequester(resolvedMatched, nil)
+
+	warnPolicyRefSource := &v1beta1.RefSource{
+		URI: "	warnVP",
+	}
+	resolvedUnsignedMatched := test.NewResolvedResource(unsignedTaskBytes, nil, warnPolicyRefSource, nil)
+	requesterUnsignedMatched := test.NewRequester(resolvedUnsignedMatched, nil)
+
+	taskRef := &v1beta1.TaskRef{ResolverRef: v1beta1.ResolverRef{Resolver: "git"}}
+
+	testcases := []struct {
+		name                       string
+		requester                  *test.Requester
+		verificationNoMatchPolicy  string
+		policies                   []*v1alpha1.VerificationPolicy
+		expected                   runtime.Object
+		expectedRefSource          *v1beta1.RefSource
+		expectedVerificationResult *trustedresources.VerificationResult
+	}{{
+		name:                       "signed task with matching policy pass verification with enforce no match policy",
+		requester:                  requesterMatched,
+		verificationNoMatchPolicy:  config.FailNoMatchPolicy,
+		policies:                   vps,
+		expected:                   v1beta1SignedTask,
+		expectedRefSource:          matchPolicyRefSource,
+		expectedVerificationResult: &trustedresources.VerificationResult{VerificationResultType: trustedresources.VerificationPass},
+	}, {
+		name:                       "signed task with matching policy pass verification with warn no match policy",
+		requester:                  requesterMatched,
+		verificationNoMatchPolicy:  config.WarnNoMatchPolicy,
+		policies:                   vps,
+		expected:                   v1beta1SignedTask,
+		expectedRefSource:          matchPolicyRefSource,
+		expectedVerificationResult: &trustedresources.VerificationResult{VerificationResultType: trustedresources.VerificationPass},
+	}, {
+		name:                       "signed task with matching policy pass verification with ignore no match policy",
+		requester:                  requesterMatched,
+		verificationNoMatchPolicy:  config.IgnoreNoMatchPolicy,
+		policies:                   vps,
+		expected:                   v1beta1SignedTask,
+		expectedRefSource:          matchPolicyRefSource,
+		expectedVerificationResult: &trustedresources.VerificationResult{VerificationResultType: trustedresources.VerificationPass},
+	}, {
+		name:                       "warn unsigned task without matching policies",
+		requester:                  requesterUnmatched,
+		verificationNoMatchPolicy:  config.WarnNoMatchPolicy,
+		policies:                   vps,
+		expected:                   v1beta1UnsignedTask,
+		expectedRefSource:          noMatchPolicyRefSource,
+		expectedVerificationResult: &trustedresources.VerificationResult{VerificationResultType: trustedresources.VerificationWarn, Err: trustedresources.ErrNoMatchedPolicies},
+	}, {
+		name:                       "task fails warn mode policy return warn VerificationResult",
+		requester:                  requesterUnsignedMatched,
+		verificationNoMatchPolicy:  config.FailNoMatchPolicy,
+		policies:                   vps,
+		expected:                   v1beta1UnsignedTask,
+		expectedRefSource:          warnPolicyRefSource,
+		expectedVerificationResult: &trustedresources.VerificationResult{VerificationResultType: trustedresources.VerificationWarn, Err: trustedresources.ErrResourceVerificationFailed},
+	}, {
+		name:                       "ignore unsigned task without matching policies",
+		requester:                  requesterUnmatched,
+		verificationNoMatchPolicy:  config.IgnoreNoMatchPolicy,
+		policies:                   vps,
+		expected:                   v1beta1UnsignedTask,
+		expectedRefSource:          noMatchPolicyRefSource,
+		expectedVerificationResult: &trustedresources.VerificationResult{VerificationResultType: trustedresources.VerificationSkip},
+	},
+	}
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx = test.SetupTrustedResourceConfig(ctx, tc.verificationNoMatchPolicy)
+			tr := &v1beta1.TaskRun{
+				ObjectMeta: metav1.ObjectMeta{Namespace: "trusted-resources"},
+				Spec: v1beta1.TaskRunSpec{
+					TaskRef:            taskRef,
+					ServiceAccountName: "default",
+				},
+			}
+			fn := resources.GetTaskFunc(ctx, k8sclient, tektonclient, tc.requester, tr, tr.Spec.TaskRef, "", "default", "default", tc.policies)
+
+			gotResolvedTask, gotRefSource, gotVerificationResult, err := fn(ctx, taskRef.Name)
+
+			if err != nil {
+				t.Fatalf("Received unexpected error ( %#v )", err)
+			}
+
+			if d := cmp.Diff(tc.expected, gotResolvedTask); d != "" {
+				t.Errorf("resolvedTask did not match: %s", diff.PrintWantGot(d))
+			}
+
+			if d := cmp.Diff(tc.expectedRefSource, gotRefSource); d != "" {
+				t.Errorf("configSources did not match: %s", diff.PrintWantGot(d))
+			}
+			if d := cmp.Diff(gotVerificationResult, tc.expectedVerificationResult, verificationResultCmp); d != "" {
+				t.Errorf("VerificationResult did not match:%s", diff.PrintWantGot(d))
+			}
+		})
+	}
+}
+
+func TestGetTaskFunc_V1Task_VerifyError(t *testing.T) {
+	ctx := context.Background()
+	signer, _, k8sclient, vps := test.SetupVerificationPolicies(t)
+	tektonclient := fake.NewSimpleClientset()
+
+	unsignedTaskBytes, err := json.Marshal(unsignedV1Task)
+	if err != nil {
+		t.Fatal("fail to marshal task", err)
+	}
+	matchPolicyRefSource := &v1beta1.RefSource{
+		URI: "https://github.com/tektoncd/catalog.git",
+		Digest: map[string]string{
+			"sha1": "a123",
+		},
+		EntryPoint: "foo/bar",
+	}
+
+	resolvedUnsigned := test.NewResolvedResource(unsignedTaskBytes, nil, matchPolicyRefSource, nil)
+	requesterUnsigned := test.NewRequester(resolvedUnsigned, nil)
+
+	signedV1Task, err := getSignedV1Task(unsignedV1Task.DeepCopy(), signer, "signed")
+	if err != nil {
+		t.Fatal("fail to sign task", err)
+	}
+	signedTaskBytes, err := json.Marshal(signedV1Task)
+	if err != nil {
+		t.Fatal("fail to marshal task", err)
+	}
+
+	noMatchPolicyRefSource := &v1beta1.RefSource{
+		URI: "abc.com",
+		Digest: map[string]string{
+			"sha1": "a123",
+		},
+		EntryPoint: "foo/bar",
+	}
+	resolvedUnmatched := test.NewResolvedResource(signedTaskBytes, nil, noMatchPolicyRefSource, nil)
+	requesterUnmatched := test.NewRequester(resolvedUnmatched, nil)
+
+	modifiedTask := signedV1Task.DeepCopy()
+	modifiedTask.Annotations["random"] = "attack"
+	modifiedTaskBytes, err := json.Marshal(modifiedTask)
+	if err != nil {
+		t.Fatal("fail to marshal task", err)
+	}
+	resolvedModified := test.NewResolvedResource(modifiedTaskBytes, nil, matchPolicyRefSource, nil)
+	requesterModified := test.NewRequester(resolvedModified, nil)
+
+	taskRef := &v1beta1.TaskRef{ResolverRef: v1beta1.ResolverRef{Resolver: "git"}}
+
+	testcases := []struct {
+		name                       string
+		requester                  *test.Requester
+		verificationNoMatchPolicy  string
+		expected                   *v1beta1.Task
+		expectedErr                error
+		expectedVerificationResult *trustedresources.VerificationResult
+	}{{
+		name:                       "unsigned task fails verification with fail no match policy",
+		requester:                  requesterUnsigned,
+		verificationNoMatchPolicy:  config.FailNoMatchPolicy,
+		expected:                   nil,
+		expectedErr:                trustedresources.ErrResourceVerificationFailed,
+		expectedVerificationResult: &trustedresources.VerificationResult{VerificationResultType: trustedresources.VerificationError, Err: trustedresources.ErrResourceVerificationFailed},
+	}, {
+		name:                       "unsigned task fails verification with warn no match policy",
+		requester:                  requesterUnsigned,
+		verificationNoMatchPolicy:  config.WarnNoMatchPolicy,
+		expected:                   nil,
+		expectedErr:                trustedresources.ErrResourceVerificationFailed,
+		expectedVerificationResult: &trustedresources.VerificationResult{VerificationResultType: trustedresources.VerificationError, Err: trustedresources.ErrResourceVerificationFailed},
+	}, {
+		name:                       "unsigned task fails verification with ignore no match policy",
+		requester:                  requesterUnsigned,
+		verificationNoMatchPolicy:  config.IgnoreNoMatchPolicy,
+		expected:                   nil,
+		expectedErr:                trustedresources.ErrResourceVerificationFailed,
+		expectedVerificationResult: &trustedresources.VerificationResult{VerificationResultType: trustedresources.VerificationError, Err: trustedresources.ErrResourceVerificationFailed},
+	}, {
+		name:                       "modified task fails verification with fail no match policy",
+		requester:                  requesterModified,
+		verificationNoMatchPolicy:  config.FailNoMatchPolicy,
+		expected:                   nil,
+		expectedErr:                trustedresources.ErrResourceVerificationFailed,
+		expectedVerificationResult: &trustedresources.VerificationResult{VerificationResultType: trustedresources.VerificationError, Err: trustedresources.ErrResourceVerificationFailed},
+	}, {
+		name:                       "modified task fails verification with warn no match policy",
+		requester:                  requesterModified,
+		verificationNoMatchPolicy:  config.WarnNoMatchPolicy,
+		expected:                   nil,
+		expectedErr:                trustedresources.ErrResourceVerificationFailed,
+		expectedVerificationResult: &trustedresources.VerificationResult{VerificationResultType: trustedresources.VerificationError, Err: trustedresources.ErrResourceVerificationFailed},
+	}, {
+		name:                       "modified task fails verification with ignore no match policy",
+		requester:                  requesterModified,
+		verificationNoMatchPolicy:  config.IgnoreNoMatchPolicy,
+		expected:                   nil,
+		expectedVerificationResult: &trustedresources.VerificationResult{VerificationResultType: trustedresources.VerificationError, Err: trustedresources.ErrResourceVerificationFailed},
+	}, {
+		name:                       "unmatched task fails with verification fail no match policy",
+		requester:                  requesterUnmatched,
+		verificationNoMatchPolicy:  config.FailNoMatchPolicy,
+		expected:                   nil,
+		expectedVerificationResult: &trustedresources.VerificationResult{VerificationResultType: trustedresources.VerificationError, Err: trustedresources.ErrNoMatchedPolicies},
+	},
+	}
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx = test.SetupTrustedResourceConfig(ctx, tc.verificationNoMatchPolicy)
+			tr := &v1beta1.TaskRun{
+				ObjectMeta: metav1.ObjectMeta{Namespace: "trusted-resources"},
+				Spec: v1beta1.TaskRunSpec{
+					TaskRef:            taskRef,
+					ServiceAccountName: "default",
+				},
+			}
+			fn := resources.GetTaskFunc(ctx, k8sclient, tektonclient, tc.requester, tr, tr.Spec.TaskRef, "", "default", "default", vps)
+
+			_, _, gotVerificationResult, _ := fn(ctx, taskRef.Name)
+			if d := cmp.Diff(gotVerificationResult, tc.expectedVerificationResult, verificationResultCmp); d != "" {
+				t.Errorf("VerificationResult did not match:%s", diff.PrintWantGot(d))
+			}
+		})
+	}
+}
+
 func TestGetTaskFunc_GetFuncError(t *testing.T) {
 	ctx := context.Background()
 	_, k8sclient, vps := test.SetupMatchAllVerificationPolicies(t, "trusted-resources")
@@ -1126,3 +1431,36 @@ spec:
   - name: array-result
     type: array
 `
+
+func getSignedV1Task(unsigned *pipelinev1.Task, signer signature.Signer, name string) (*pipelinev1.Task, error) {
+	signed := unsigned.DeepCopy()
+	signed.Name = name
+	if signed.Annotations == nil {
+		signed.Annotations = map[string]string{}
+	}
+	signature, err := signInterface(signer, signed)
+	if err != nil {
+		return nil, err
+	}
+	signed.Annotations[trustedresources.SignatureAnnotation] = base64.StdEncoding.EncodeToString(signature)
+	return signed, nil
+}
+
+func signInterface(signer signature.Signer, i interface{}) ([]byte, error) {
+	if signer == nil {
+		return nil, fmt.Errorf("signer is nil")
+	}
+	b, err := json.Marshal(i)
+	if err != nil {
+		return nil, err
+	}
+	h := sha256.New()
+	h.Write(b)
+
+	sig, err := signer.SignMessage(bytes.NewReader(h.Sum(nil)))
+	if err != nil {
+		return nil, err
+	}
+
+	return sig, nil
+}

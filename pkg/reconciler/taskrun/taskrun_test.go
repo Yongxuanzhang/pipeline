@@ -4994,7 +4994,7 @@ spec:
     name: myarg
     type: string
   steps:
-  - script: echo $(inputs.params.myarg)
+  - script: echo $(params.myarg)
     image: myimage
     name: mycontainer
 `)
@@ -5099,7 +5099,7 @@ spec:
     name: myarg
     type: string
   steps:
-  - script: echo $(inputs.params.myarg)
+  - script: echo $(params.myarg)
     image: myimage
     name: mycontainer
 `)

@@ -1,0 +1,45 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: array-param
+spec:
+  params:
+    - name: environments
+      type: array
+  tasks:
+    - name: deploy
+      params:
+        - name: environment1
+          value: '$(params.environments[0])'
+        - name: environment2
+          value: '$(params.environments[1])'
+        - name: environments
+          value: '$(params.environments[*])'
+      taskSpec:
+        params:
+          - name: environments
+            type: array
+        steps:
+          - name: use-environments
+            image: bash:latest
+            args: [
+              "$(params.environments[*])",
+            ]
+            script: |
+              for arg in "$@"; do
+                echo "Arg: $arg"
+              done
+---
+apiVersion: tekton.dev/v1beta1
+kind: PipelineRun
+metadata:
+  name: pipelinerun-param-array-indexing-loop
+spec:
+  pipelineRef:
+    name: array-param
+  params:
+    - name: environments
+      value:
+        - 'staging'
+        - 'qa'
+        - 'prod'

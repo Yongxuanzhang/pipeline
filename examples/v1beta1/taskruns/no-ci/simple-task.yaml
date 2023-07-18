@@ -1,0 +1,13 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: windows-task-na
+spec:
+  steps:
+  - name: ping-localhost
+    image: mcr.microsoft.com/windows/nanoserver:1809
+    command: ["cmd.exe"]
+    args:
+      - "/S"
+      - "/C"
+      - "echo Hello from Windows"

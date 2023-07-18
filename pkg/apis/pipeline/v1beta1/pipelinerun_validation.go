@@ -41,6 +41,8 @@ func (pr *PipelineRun) SupportedVerbs() []admissionregistrationv1.OperationType 
 
 // Validate pipelinerun
 func (pr *PipelineRun) Validate(ctx context.Context) *apis.FieldError {
+	fmt.Println("!!!!v1beta1 pr validate")
+	fmt.Println("!!!!pr", pr)
 	if apis.IsInDelete(ctx) {
 		return nil
 	}

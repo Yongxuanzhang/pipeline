@@ -16,7 +16,10 @@ limitations under the License.
 
 package pipeline
 
-import "k8s.io/apimachinery/pkg/runtime/schema"
+import (
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+)
 
 const (
 	// GroupName is the Kubernetes resource group name for Pipeline types.
@@ -89,3 +92,7 @@ var (
 		Resource: "customruns",
 	}
 )
+
+
+// SchemeGroupVersion is group version used to register these objects
+var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: runtime.APIVersionInternal}

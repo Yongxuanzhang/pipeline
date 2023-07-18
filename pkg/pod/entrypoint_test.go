@@ -253,8 +253,8 @@ func TestOrderContainersWithDebugOnFailure(t *testing.T) {
 }
 
 func TestEntryPointResults(t *testing.T) {
-	taskSpec := v1.TaskSpec{
-		Results: []v1.TaskResult{{
+	taskSpec := pipeline.TaskSpec{
+		Results: []pipeline.TaskResult{{
 			Name:        "sum",
 			Description: "This is the sum result of the task",
 		}, {
@@ -331,8 +331,8 @@ func TestEntryPointResults(t *testing.T) {
 }
 
 func TestEntryPointResultsSingleStep(t *testing.T) {
-	taskSpec := v1.TaskSpec{
-		Results: []v1.TaskResult{{
+	taskSpec := pipeline.TaskSpec{
+		Results: []pipeline.TaskResult{{
 			Name:        "sum",
 			Description: "This is the sum result of the task",
 		}, {
@@ -371,8 +371,8 @@ func TestEntryPointResultsSingleStep(t *testing.T) {
 	}
 }
 func TestEntryPointSingleResultsSingleStep(t *testing.T) {
-	taskSpec := v1.TaskSpec{
-		Results: []v1.TaskResult{{
+	taskSpec := pipeline.TaskSpec{
+		Results: []pipeline.TaskResult{{
 			Name:        "sum",
 			Description: "This is the sum result of the task",
 		}},
@@ -421,15 +421,15 @@ func TestEntryPointOnError(t *testing.T) {
 
 	for _, tc := range []struct {
 		desc           string
-		taskSpec       v1.TaskSpec
+		taskSpec       pipeline.TaskSpec
 		wantContainers []corev1.Container
 		err            error
 	}{{
-		taskSpec: v1.TaskSpec{
-			Steps: []v1.Step{{
-				OnError: v1.Continue,
+		taskSpec: pipeline.TaskSpec{
+			Steps: []pipeline.Step{{
+				OnError: pipeline.Continue,
 			}, {
-				OnError: v1.StopAndFail,
+				OnError: pipeline.StopAndFail,
 			}},
 		},
 		wantContainers: []corev1.Container{{
@@ -462,8 +462,8 @@ func TestEntryPointOnError(t *testing.T) {
 			TerminationMessagePath: "/tekton/termination",
 		}},
 	}, {
-		taskSpec: v1.TaskSpec{
-			Steps: []v1.Step{{
+		taskSpec: pipeline.TaskSpec{
+			Steps: []pipeline.Step{{
 				OnError: "invalid-on-error",
 			}},
 		},
@@ -491,20 +491,20 @@ func TestEntryPointOnError(t *testing.T) {
 }
 
 func TestEntryPointStepOutputConfigs(t *testing.T) {
-	taskSpec := v1.TaskSpec{
-		Steps: []v1.Step{{
-			StdoutConfig: &v1.StepOutputConfig{
+	taskSpec := pipeline.TaskSpec{
+		Steps: []pipeline.Step{{
+			StdoutConfig: &pipeline.StepOutputConfig{
 				Path: "step-1-out",
 			},
 		}, {
-			StderrConfig: &v1.StepOutputConfig{
+			StderrConfig: &pipeline.StepOutputConfig{
 				Path: "step-2-err",
 			},
 		}, {
-			StdoutConfig: &v1.StepOutputConfig{
+			StdoutConfig: &pipeline.StepOutputConfig{
 				Path: "step-3-out",
 			},
-			StderrConfig: &v1.StepOutputConfig{
+			StderrConfig: &pipeline.StepOutputConfig{
 				Path: "step-3-err",
 			},
 		}},

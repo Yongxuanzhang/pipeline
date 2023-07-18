@@ -1200,7 +1200,7 @@ status:
       EnableProvenanceInStatus: true
       ResultExtractionMethod: "termination-message"
       MaxResultSize: 4096
-      Coschedule: "workspaces" 
+      Coschedule: "workspaces"
 `)
 	d := test.Data{
 		PipelineRuns: prs,

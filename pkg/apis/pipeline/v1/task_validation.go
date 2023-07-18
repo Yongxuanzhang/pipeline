@@ -26,7 +26,6 @@ import (
 
 	"github.com/tektoncd/pipeline/pkg/apis/config"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline"
-	"github.com/tektoncd/pipeline/pkg/apis/validate"
 	"github.com/tektoncd/pipeline/pkg/apis/version"
 	"github.com/tektoncd/pipeline/pkg/substitution"
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
@@ -61,6 +60,15 @@ var objectVariableNameFormatRegex = regexp.MustCompile(objectVariableNameFormat)
 
 // Validate implements apis.Validatable
 func (t *Task) Validate(ctx context.Context) *apis.FieldError {
+	fmt.Println("!!!!!v1 task validate")
+  internalTask := &pipeline.Task{}
+	err:=autoConvert_v1_Task_To_pipeline_Task(t,internalTask,nil)
+	if err!=nil{
+		return apis.ErrGeneric(err.Error())
+	}
+  return internalTask.Validate(ctx)
+
+	/*
 	errs := validate.ObjectMetadata(t.GetObjectMeta()).ViaField("metadata")
 	errs = errs.Also(t.Spec.Validate(apis.WithinSpec(ctx)).ViaField("spec"))
 	// When a Task is created directly, instead of declared inline in a TaskRun or PipelineRun,
@@ -72,6 +80,7 @@ func (t *Task) Validate(ctx context.Context) *apis.FieldError {
 	// TODO(#6592): Decouple API versioning from feature versioning
 	errs = errs.Also(t.Spec.ValidateBetaFields(ctx))
 	return errs
+	*/
 }
 
 // Validate implements apis.Validatable

@@ -23,6 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/tektoncd/pipeline/pkg/apis/pipeline"
 	v1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1"
 	"github.com/tektoncd/pipeline/pkg/reconciler/taskrun/resources"
 	"github.com/tektoncd/pipeline/test/diff"
@@ -30,49 +31,49 @@ import (
 
 func TestValidateResolvedTask_ValidParams(t *testing.T) {
 	ctx := context.Background()
-	task := &v1.Task{
+	task := &pipeline.Task{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-		Spec: v1.TaskSpec{
-			Steps: []v1.Step{{
+		Spec: pipeline.TaskSpec{
+			Steps: []pipeline.Step{{
 				Image:   "myimage",
 				Command: []string{"mycmd"},
 			}},
-			Params: []v1.ParamSpec{
+			Params: []pipeline.ParamSpec{
 				{
 					Name: "foo",
-					Type: v1.ParamTypeString,
+					Type: pipeline.ParamTypeString,
 				}, {
 					Name: "bar",
-					Type: v1.ParamTypeString,
+					Type: pipeline.ParamTypeString,
 				}, {
 					Name: "zoo",
-					Type: v1.ParamTypeString,
+					Type: pipeline.ParamTypeString,
 				}, {
 					Name: "matrixParam",
-					Type: v1.ParamTypeString,
+					Type: pipeline.ParamTypeString,
 				}, {
 					Name: "include",
-					Type: v1.ParamTypeString,
+					Type: pipeline.ParamTypeString,
 				}, {
 					Name: "arrayResultRef",
-					Type: v1.ParamTypeArray,
+					Type: pipeline.ParamTypeArray,
 				}, {
 					Name: "myObjWithoutDefault",
-					Type: v1.ParamTypeObject,
-					Properties: map[string]v1.PropertySpec{
+					Type: pipeline.ParamTypeObject,
+					Properties: map[string]pipeline.PropertySpec{
 						"key1": {},
 						"key2": {},
 					},
 				}, {
 					Name: "myObjWithDefault",
-					Type: v1.ParamTypeObject,
-					Properties: map[string]v1.PropertySpec{
+					Type: pipeline.ParamTypeObject,
+					Properties: map[string]pipeline.PropertySpec{
 						"key1": {},
 						"key2": {},
 						"key3": {},
 					},
-					Default: &v1.ParamValue{
-						Type: v1.ParamTypeObject,
+					Default: &pipeline.ParamValue{
+						Type: pipeline.ParamTypeObject,
 						ObjectVal: map[string]string{
 							"key1": "val1-default",
 							"key2": "val2-default", // key2 is also provided and will be overridden by taskrun
@@ -86,40 +87,40 @@ func TestValidateResolvedTask_ValidParams(t *testing.T) {
 	rtr := &resources.ResolvedTask{
 		TaskSpec: &task.Spec,
 	}
-	p := v1.Params{{
+	p := pipeline.Params{{
 		Name:  "foo",
-		Value: *v1.NewStructuredValues("somethinggood"),
+		Value: *pipeline.NewStructuredValues("somethinggood"),
 	}, {
 		Name:  "bar",
-		Value: *v1.NewStructuredValues("somethinggood"),
+		Value: *pipeline.NewStructuredValues("somethinggood"),
 	}, {
 		Name:  "arrayResultRef",
-		Value: *v1.NewStructuredValues("$(results.resultname[*])"),
+		Value: *pipeline.NewStructuredValues("$(results.resultname[*])"),
 	}, {
 		Name: "myObjWithoutDefault",
-		Value: *v1.NewObject(map[string]string{
+		Value: *pipeline.NewObject(map[string]string{
 			"key1":      "val1",
 			"key2":      "val2",
 			"extra_key": "val3",
 		}),
 	}, {
 		Name: "myObjWithDefault",
-		Value: *v1.NewObject(map[string]string{
+		Value: *pipeline.NewObject(map[string]string{
 			"key2": "val2",
 			"key3": "val3",
 		}),
 	}}
-	m := &v1.Matrix{
-		Params: v1.Params{{
+	m := &pipeline.Matrix{
+		Params: pipeline.Params{{
 			Name:  "zoo",
-			Value: *v1.NewStructuredValues("a", "b", "c"),
+			Value: *pipeline.NewStructuredValues("a", "b", "c"),
 		}, {
-			Name: "matrixParam", Value: v1.ParamValue{Type: v1.ParamTypeArray, ArrayVal: []string{}},
+			Name: "matrixParam", Value: pipeline.ParamValue{Type: pipeline.ParamTypeArray, ArrayVal: []string{}},
 		}},
-		Include: []v1.IncludeParams{{
+		Include: []pipeline.IncludeParams{{
 			Name: "build-1",
-			Params: v1.Params{{
-				Name: "include", Value: v1.ParamValue{Type: v1.ParamTypeString, StringVal: "string-1"},
+			Params: pipeline.Params{{
+				Name: "include", Value: pipeline.ParamValue{Type: pipeline.ParamTypeString, StringVal: "string-1"},
 			}},
 		}},
 	}
@@ -131,87 +132,87 @@ func TestValidateResolvedTask_ExtraValidParams(t *testing.T) {
 	ctx := context.Background()
 	tcs := []struct {
 		name   string
-		task   v1.Task
-		params v1.Params
-		matrix *v1.Matrix
+		task   pipeline.Task
+		params pipeline.Params
+		matrix *pipeline.Matrix
 	}{{
 		name: "extra-str-param",
-		task: v1.Task{
+		task: pipeline.Task{
 			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-			Spec: v1.TaskSpec{
-				Params: []v1.ParamSpec{{
+			Spec: pipeline.TaskSpec{
+				Params: []pipeline.ParamSpec{{
 					Name: "foo",
-					Type: v1.ParamTypeString,
+					Type: pipeline.ParamTypeString,
 				}},
 			},
 		},
-		params: v1.Params{{
+		params: pipeline.Params{{
 			Name:  "foo",
-			Value: *v1.NewStructuredValues("string"),
+			Value: *pipeline.NewStructuredValues("string"),
 		}, {
 			Name:  "extrastr",
-			Value: *v1.NewStructuredValues("extra"),
+			Value: *pipeline.NewStructuredValues("extra"),
 		}},
 	}, {
 		name: "extra-arr-param",
-		task: v1.Task{
+		task: pipeline.Task{
 			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-			Spec: v1.TaskSpec{
-				Params: []v1.ParamSpec{{
+			Spec: pipeline.TaskSpec{
+				Params: []pipeline.ParamSpec{{
 					Name: "foo",
-					Type: v1.ParamTypeString,
+					Type: pipeline.ParamTypeString,
 				}},
 			},
 		},
-		params: v1.Params{{
+		params: pipeline.Params{{
 			Name:  "foo",
-			Value: *v1.NewStructuredValues("string"),
+			Value: *pipeline.NewStructuredValues("string"),
 		}, {
 			Name:  "extraArr",
-			Value: *v1.NewStructuredValues("extra", "arr"),
+			Value: *pipeline.NewStructuredValues("extra", "arr"),
 		}},
 	}, {
 		name: "extra-obj-param",
-		task: v1.Task{
+		task: pipeline.Task{
 			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-			Spec: v1.TaskSpec{
-				Params: []v1.ParamSpec{{
+			Spec: pipeline.TaskSpec{
+				Params: []pipeline.ParamSpec{{
 					Name: "foo",
-					Type: v1.ParamTypeString,
+					Type: pipeline.ParamTypeString,
 				}},
 			},
 		},
-		params: v1.Params{{
+		params: pipeline.Params{{
 			Name:  "foo",
-			Value: *v1.NewStructuredValues("string"),
+			Value: *pipeline.NewStructuredValues("string"),
 		}, {
 			Name: "myObjWithDefault",
-			Value: *v1.NewObject(map[string]string{
+			Value: *pipeline.NewObject(map[string]string{
 				"key2": "val2",
 				"key3": "val3",
 			}),
 		}},
 	}, {
 		name: "extra-param-matrix",
-		task: v1.Task{
+		task: pipeline.Task{
 			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-			Spec: v1.TaskSpec{
-				Params: []v1.ParamSpec{{
+			Spec: pipeline.TaskSpec{
+				Params: []pipeline.ParamSpec{{
 					Name: "include",
-					Type: v1.ParamTypeString,
+					Type: pipeline.ParamTypeString,
 				}},
 			},
 		},
-		params: v1.Params{{}},
-		matrix: &v1.Matrix{
-			Params: v1.Params{{
+		params: pipeline.Params{{}},
+		matrix: &pipeline.Matrix{
+			Params: pipeline.Params{{
 				Name:  "extraArr",
-				Value: *v1.NewStructuredValues("extra", "arr"),
+				Value: *pipeline.NewStructuredValues("extra", "arr"),
 			}},
-			Include: []v1.IncludeParams{{
+			Include: []pipeline.IncludeParams{{
 				Name: "build-1",
-				Params: v1.Params{{
-					Name: "include", Value: *v1.NewStructuredValues("string"),
+				Params: pipeline.Params{{
+					Name: "include", Value: *pipeline.NewStructuredValues("string"),
 				}},
 			}},
 		},
@@ -232,198 +233,198 @@ func TestValidateResolvedTask_InvalidParams(t *testing.T) {
 	ctx := context.Background()
 	tcs := []struct {
 		name    string
-		task    v1.Task
-		params  v1.Params
-		matrix  *v1.Matrix
+		task    pipeline.Task
+		params  pipeline.Params
+		matrix  *pipeline.Matrix
 		wantErr string
 	}{{
 		name: "missing-params-string",
-		task: v1.Task{
+		task: pipeline.Task{
 			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-			Spec: v1.TaskSpec{
-				Params: []v1.ParamSpec{{
+			Spec: pipeline.TaskSpec{
+				Params: []pipeline.ParamSpec{{
 					Name: "foo",
-					Type: v1.ParamTypeString,
+					Type: pipeline.ParamTypeString,
 				}},
 			},
 		},
-		params: v1.Params{{
+		params: pipeline.Params{{
 			Name:  "missing",
-			Value: *v1.NewStructuredValues("somethingfun"),
+			Value: *pipeline.NewStructuredValues("somethingfun"),
 		}},
-		matrix:  &v1.Matrix{},
+		matrix:  &pipeline.Matrix{},
 		wantErr: "invalid input params for task : missing values for these params which have no default values: [foo]",
 	}, {
 		name: "missing-params-arr",
-		task: v1.Task{
+		task: pipeline.Task{
 			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-			Spec: v1.TaskSpec{
-				Params: []v1.ParamSpec{{
+			Spec: pipeline.TaskSpec{
+				Params: []pipeline.ParamSpec{{
 					Name: "foo",
-					Type: v1.ParamTypeArray,
+					Type: pipeline.ParamTypeArray,
 				}},
 			},
 		},
-		params: v1.Params{{
+		params: pipeline.Params{{
 			Name:  "missing",
-			Value: *v1.NewStructuredValues("array", "param"),
+			Value: *pipeline.NewStructuredValues("array", "param"),
 		}},
-		matrix:  &v1.Matrix{},
+		matrix:  &pipeline.Matrix{},
 		wantErr: "invalid input params for task : missing values for these params which have no default values: [foo]",
 	}, {
 		name: "invalid-string-param",
-		task: v1.Task{
+		task: pipeline.Task{
 			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-			Spec: v1.TaskSpec{
-				Params: []v1.ParamSpec{{
+			Spec: pipeline.TaskSpec{
+				Params: []pipeline.ParamSpec{{
 					Name: "foo",
-					Type: v1.ParamTypeString,
+					Type: pipeline.ParamTypeString,
 				}},
 			},
 		},
-		params: v1.Params{{
+		params: pipeline.Params{{
 			Name:  "foo",
-			Value: *v1.NewStructuredValues("array", "param"),
+			Value: *pipeline.NewStructuredValues("array", "param"),
 		}},
-		matrix:  &v1.Matrix{},
+		matrix:  &pipeline.Matrix{},
 		wantErr: "invalid input params for task : param types don't match the user-specified type: [foo]",
 	}, {
 		name: "invalid-arr-param",
-		task: v1.Task{
+		task: pipeline.Task{
 			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-			Spec: v1.TaskSpec{
-				Params: []v1.ParamSpec{{
+			Spec: pipeline.TaskSpec{
+				Params: []pipeline.ParamSpec{{
 					Name: "foo",
-					Type: v1.ParamTypeArray,
+					Type: pipeline.ParamTypeArray,
 				}},
 			},
 		},
-		params: v1.Params{{
+		params: pipeline.Params{{
 			Name:  "foo",
-			Value: *v1.NewStructuredValues("string"),
+			Value: *pipeline.NewStructuredValues("string"),
 		}},
-		matrix:  &v1.Matrix{},
+		matrix:  &pipeline.Matrix{},
 		wantErr: "invalid input params for task : param types don't match the user-specified type: [foo]",
 	}, {name: "missing-param-in-matrix",
-		task: v1.Task{
+		task: pipeline.Task{
 			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-			Spec: v1.TaskSpec{
-				Params: []v1.ParamSpec{{
+			Spec: pipeline.TaskSpec{
+				Params: []pipeline.ParamSpec{{
 					Name: "bar",
-					Type: v1.ParamTypeArray,
+					Type: pipeline.ParamTypeArray,
 				}},
 			},
 		},
-		params: v1.Params{{}},
-		matrix: &v1.Matrix{
-			Params: v1.Params{{
+		params: pipeline.Params{{}},
+		matrix: &pipeline.Matrix{
+			Params: pipeline.Params{{
 				Name:  "missing",
-				Value: *v1.NewStructuredValues("foo"),
+				Value: *pipeline.NewStructuredValues("foo"),
 			}}},
 		wantErr: "invalid input params for task : missing values for these params which have no default values: [bar]",
 	}, {
 		name: "missing-param-in-matrix-include",
-		task: v1.Task{
+		task: pipeline.Task{
 			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-			Spec: v1.TaskSpec{
-				Params: []v1.ParamSpec{{
+			Spec: pipeline.TaskSpec{
+				Params: []pipeline.ParamSpec{{
 					Name: "bar",
-					Type: v1.ParamTypeArray,
+					Type: pipeline.ParamTypeArray,
 				}},
 			},
 		},
-		params: v1.Params{{}},
-		matrix: &v1.Matrix{
-			Include: []v1.IncludeParams{{
+		params: pipeline.Params{{}},
+		matrix: &pipeline.Matrix{
+			Include: []pipeline.IncludeParams{{
 				Name: "build-1",
-				Params: v1.Params{{
-					Name: "missing", Value: v1.ParamValue{Type: v1.ParamTypeString, StringVal: "string"},
+				Params: pipeline.Params{{
+					Name: "missing", Value: pipeline.ParamValue{Type: pipeline.ParamTypeString, StringVal: "string"},
 				}},
 			}},
 		},
 		wantErr: "invalid input params for task : missing values for these params which have no default values: [bar]",
 	}, {
 		name: "invalid-arr-in-matrix-param",
-		task: v1.Task{
+		task: pipeline.Task{
 			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-			Spec: v1.TaskSpec{
-				Params: []v1.ParamSpec{{
+			Spec: pipeline.TaskSpec{
+				Params: []pipeline.ParamSpec{{
 					Name: "bar",
-					Type: v1.ParamTypeArray,
+					Type: pipeline.ParamTypeArray,
 				}},
 			},
 		},
-		params: v1.Params{{}},
-		matrix: &v1.Matrix{
-			Params: v1.Params{{
+		params: pipeline.Params{{}},
+		matrix: &pipeline.Matrix{
+			Params: pipeline.Params{{
 				Name:  "bar",
-				Value: *v1.NewStructuredValues("foo"),
+				Value: *pipeline.NewStructuredValues("foo"),
 			}}},
 		wantErr: "invalid input params for task : param types don't match the user-specified type: [bar]",
 	}, {
 		name: "invalid-str-in-matrix-include-param",
-		task: v1.Task{
+		task: pipeline.Task{
 			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-			Spec: v1.TaskSpec{
-				Params: []v1.ParamSpec{{
+			Spec: pipeline.TaskSpec{
+				Params: []pipeline.ParamSpec{{
 					Name: "bar",
-					Type: v1.ParamTypeArray,
+					Type: pipeline.ParamTypeArray,
 				}},
 			},
 		},
-		params: v1.Params{{}},
-		matrix: &v1.Matrix{
-			Include: []v1.IncludeParams{{
+		params: pipeline.Params{{}},
+		matrix: &pipeline.Matrix{
+			Include: []pipeline.IncludeParams{{
 				Name: "build-1",
-				Params: v1.Params{{
-					Name: "bar", Value: v1.ParamValue{Type: v1.ParamTypeString, StringVal: "string"},
+				Params: pipeline.Params{{
+					Name: "bar", Value: pipeline.ParamValue{Type: pipeline.ParamTypeString, StringVal: "string"},
 				}},
 			}},
 		},
 		wantErr: "invalid input params for task : param types don't match the user-specified type: [bar]",
 	}, {
 		name: "missing-params-obj",
-		task: v1.Task{
+		task: pipeline.Task{
 			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-			Spec: v1.TaskSpec{
-				Params: []v1.ParamSpec{{
+			Spec: pipeline.TaskSpec{
+				Params: []pipeline.ParamSpec{{
 					Name: "foo",
-					Type: v1.ParamTypeArray,
+					Type: pipeline.ParamTypeArray,
 				}},
 			},
 		},
-		params: v1.Params{{
+		params: pipeline.Params{{
 			Name: "missing-obj",
-			Value: *v1.NewObject(map[string]string{
+			Value: *pipeline.NewObject(map[string]string{
 				"key1":    "val1",
 				"misskey": "val2",
 			}),
 		}},
-		matrix:  &v1.Matrix{},
+		matrix:  &pipeline.Matrix{},
 		wantErr: "invalid input params for task : missing values for these params which have no default values: [foo]",
 	}, {
 		name: "missing object param keys",
-		task: v1.Task{
+		task: pipeline.Task{
 			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-			Spec: v1.TaskSpec{
-				Params: []v1.ParamSpec{{
+			Spec: pipeline.TaskSpec{
+				Params: []pipeline.ParamSpec{{
 					Name: "myObjWithoutDefault",
-					Type: v1.ParamTypeObject,
-					Properties: map[string]v1.PropertySpec{
+					Type: pipeline.ParamTypeObject,
+					Properties: map[string]pipeline.PropertySpec{
 						"key1": {},
 						"key2": {},
 					},
 				}},
 			},
 		},
-		params: v1.Params{{
+		params: pipeline.Params{{
 			Name: "myObjWithoutDefault",
-			Value: *v1.NewObject(map[string]string{
+			Value: *pipeline.NewObject(map[string]string{
 				"key1":    "val1",
 				"misskey": "val2",
 			}),
 		}},
-		matrix:  &v1.Matrix{},
+		matrix:  &pipeline.Matrix{},
 		wantErr: "invalid input params for task : missing keys for these params which are required in ParamSpec's properties map[myObjWithoutDefault:[key2]]",
 	}}
 	for _, tc := range tcs {
@@ -442,13 +443,13 @@ func TestValidateResolvedTask_InvalidParams(t *testing.T) {
 func TestValidateOverrides(t *testing.T) {
 	tcs := []struct {
 		name    string
-		ts      *v1.TaskSpec
+		ts      *pipeline.TaskSpec
 		trs     *v1.TaskRunSpec
 		wantErr bool
 	}{{
 		name: "valid stepOverrides",
-		ts: &v1.TaskSpec{
-			Steps: []v1.Step{{
+		ts: &pipeline.TaskSpec{
+			Steps: []pipeline.Step{{
 				Name: "step1",
 			}, {
 				Name: "step2",
@@ -461,8 +462,8 @@ func TestValidateOverrides(t *testing.T) {
 		},
 	}, {
 		name: "valid sidecarOverrides",
-		ts: &v1.TaskSpec{
-			Sidecars: []v1.Sidecar{{
+		ts: &pipeline.TaskSpec{
+			Sidecars: []pipeline.Sidecar{{
 				Name: "step1",
 			}, {
 				Name: "step2",
@@ -475,7 +476,7 @@ func TestValidateOverrides(t *testing.T) {
 		},
 	}, {
 		name: "invalid stepOverrides",
-		ts:   &v1.TaskSpec{},
+		ts:   &pipeline.TaskSpec{},
 		trs: &v1.TaskRunSpec{
 			StepSpecs: []v1.TaskRunStepSpec{{
 				Name: "step1",
@@ -484,7 +485,7 @@ func TestValidateOverrides(t *testing.T) {
 		wantErr: true,
 	}, {
 		name: "invalid sidecarOverrides",
-		ts:   &v1.TaskSpec{},
+		ts:   &pipeline.TaskSpec{},
 		trs: &v1.TaskRunSpec{
 			SidecarSpecs: []v1.TaskRunSidecarSpec{{
 				Name: "step1",
@@ -506,7 +507,7 @@ func TestValidateResult(t *testing.T) {
 	tcs := []struct {
 		name    string
 		tr      *v1.TaskRun
-		rtr     *v1.TaskSpec
+		rtr     *pipeline.TaskSpec
 		wantErr bool
 	}{{
 		name: "valid taskrun spec results",
@@ -552,8 +553,8 @@ func TestValidateResult(t *testing.T) {
 				},
 			},
 		},
-		rtr: &v1.TaskSpec{
-			Results: []v1.TaskResult{},
+		rtr: &pipeline.TaskSpec{
+			Results: []pipeline.TaskResult{},
 		},
 		wantErr: false,
 	}, {
@@ -599,8 +600,8 @@ func TestValidateResult(t *testing.T) {
 				},
 			},
 		},
-		rtr: &v1.TaskSpec{
-			Results: []v1.TaskResult{},
+		rtr: &pipeline.TaskSpec{
+			Results: []pipeline.TaskResult{},
 		},
 		wantErr: false,
 	}, {
@@ -647,8 +648,8 @@ func TestValidateResult(t *testing.T) {
 				},
 			},
 		},
-		rtr: &v1.TaskSpec{
-			Results: []v1.TaskResult{},
+		rtr: &pipeline.TaskSpec{
+			Results: []pipeline.TaskResult{},
 		},
 		wantErr: true,
 	}, {
@@ -681,20 +682,20 @@ func TestValidateResult(t *testing.T) {
 				},
 			},
 		},
-		rtr: &v1.TaskSpec{
-			Results: []v1.TaskResult{
+		rtr: &pipeline.TaskSpec{
+			Results: []pipeline.TaskResult{
 				{
 					Name: "string-result",
-					Type: v1.ResultsTypeString,
+					Type: pipeline.ResultsTypeString,
 				},
 				{
 					Name: "array-result",
-					Type: v1.ResultsTypeArray,
+					Type: pipeline.ResultsTypeArray,
 				},
 				{
 					Name:       "object-result",
-					Type:       v1.ResultsTypeObject,
-					Properties: map[string]v1.PropertySpec{"hello": {Type: "string"}},
+					Type:       pipeline.ResultsTypeObject,
+					Properties: map[string]pipeline.PropertySpec{"hello": {Type: "string"}},
 				},
 			},
 		},
@@ -725,8 +726,8 @@ func TestValidateResult(t *testing.T) {
 				},
 			},
 		},
-		rtr: &v1.TaskSpec{
-			Results: []v1.TaskResult{},
+		rtr: &pipeline.TaskSpec{
+			Results: []pipeline.TaskResult{},
 		},
 		wantErr: true,
 	}, {
@@ -749,12 +750,12 @@ func TestValidateResult(t *testing.T) {
 				},
 			},
 		},
-		rtr: &v1.TaskSpec{
-			Results: []v1.TaskResult{
+		rtr: &pipeline.TaskSpec{
+			Results: []pipeline.TaskResult{
 				{
 					Name:       "object-result",
-					Type:       v1.ResultsTypeObject,
-					Properties: map[string]v1.PropertySpec{"world": {Type: "string"}},
+					Type:       pipeline.ResultsTypeObject,
+					Properties: map[string]pipeline.PropertySpec{"world": {Type: "string"}},
 				},
 			},
 		},
@@ -810,8 +811,8 @@ func TestValidateResult(t *testing.T) {
 				},
 			},
 		},
-		rtr: &v1.TaskSpec{
-			Results: []v1.TaskResult{},
+		rtr: &pipeline.TaskSpec{
+			Results: []pipeline.TaskResult{},
 		},
 		wantErr: true,
 	}}

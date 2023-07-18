@@ -65,6 +65,9 @@ var types = map[schema.GroupVersionKind]resourcesemantics.GenericCRD{
 	v1.SchemeGroupVersion.WithKind("TaskRun"):     &v1.TaskRun{},
 	v1.SchemeGroupVersion.WithKind("PipelineRun"): &v1.PipelineRun{},
 
+	// internal
+	pipeline.SchemeGroupVersion.WithKind("Task") : &pipeline.Task{},
+
 	// resolution
 	// v1alpha1
 	resolutionv1alpha1.SchemeGroupVersion.WithKind("ResolutionRequest"): &resolutionv1alpha1.ResolutionRequest{},

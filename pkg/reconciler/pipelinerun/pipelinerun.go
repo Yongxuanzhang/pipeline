@@ -567,7 +567,29 @@ func (c *Reconciler) reconcile(ctx context.Context, pr *v1.PipelineRun, getPipel
 
 	for _, rpt := range pipelineRunFacts.State {
 		if !rpt.IsCustomTask() {
-			err := taskrun.ValidateResolvedTask(ctx, rpt.PipelineTask.Params, rpt.PipelineTask.Matrix, rpt.ResolvedTask)
+			internalParams:=[]pipeline.Param{}
+			for _,p:=range rpt.PipelineTask.Params{
+				internalParam:=pipeline.Param{}
+				err:=v1.Convert_v1_Param_To_pipeline_Param(&p,&internalParam,nil)
+				if err!=nil{
+					logger.Errorf("Failed to convert v1 Param to internal Param for pipelinerun %q with error %v", pr.Name, err)
+					pr.Status.MarkFailed(ReasonFailedValidation, err.Error())
+					return controller.NewPermanentError(err)
+				}
+				internalParams = append(internalParams, internalParam)
+			}
+			internalMatrix:=&pipeline.Matrix{}
+			if rpt.PipelineTask.Matrix!=nil{
+				err:=v1.Convert_v1_Matrix_To_pipeline_Matrix(rpt.PipelineTask.Matrix,internalMatrix,nil)
+				if err!=nil{
+					logger.Errorf("Failed to convert v1 Matrix to internal Matrix for pipelinerun %q with error %v", pr.Name, err)
+					pr.Status.MarkFailed(ReasonFailedValidation, err.Error())
+					return controller.NewPermanentError(err)
+				}
+
+			}
+
+			err = taskrun.ValidateResolvedTask(ctx, internalParams, internalMatrix, rpt.ResolvedTask)
 			if err != nil {
 				logger.Errorf("Failed to validate pipelinerun %q with error %v", pr.Name, err)
 				pr.Status.MarkFailed(ReasonFailedValidation, err.Error())
@@ -868,7 +890,12 @@ func (c *Reconciler) createTaskRun(ctx context.Context, taskRunName string, para
 		// We pass the entire, original task ref because it may contain additional references like a Bundle url.
 		tr.Spec.TaskRef = rpt.PipelineTask.TaskRef
 	} else if rpt.ResolvedTask.TaskSpec != nil {
-		tr.Spec.TaskSpec = rpt.ResolvedTask.TaskSpec
+		v1ts:=&v1.TaskSpec{}
+		err:=v1.Convert_pipeline_TaskSpec_To_v1_TaskSpec(rpt.ResolvedTask.TaskSpec,v1ts,nil )
+		if err!=nil{
+			return nil,err
+		}
+		tr.Spec.TaskSpec = v1ts
 	}
 
 	var pipelinePVCWorkspaceName string

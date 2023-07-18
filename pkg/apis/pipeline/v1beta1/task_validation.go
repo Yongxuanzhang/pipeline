@@ -26,7 +26,7 @@ import (
 
 	"github.com/tektoncd/pipeline/pkg/apis/config"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline"
-	"github.com/tektoncd/pipeline/pkg/apis/validate"
+	v1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1"
 	"github.com/tektoncd/pipeline/pkg/apis/version"
 	"github.com/tektoncd/pipeline/pkg/substitution"
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
@@ -61,11 +61,18 @@ var objectVariableNameFormatRegex = regexp.MustCompile(objectVariableNameFormat)
 
 // Validate implements apis.Validatable
 func (t *Task) Validate(ctx context.Context) *apis.FieldError {
-	errs := validate.ObjectMetadata(t.GetObjectMeta()).ViaField("metadata")
-	errs = errs.Also(t.Spec.Validate(apis.WithinSpec(ctx)).ViaField("spec"))
+	v1task:=&v1.Task{}
+	t.ConvertTo(ctx,v1task)
+	fmt.Println("!!!!!v1beta1->v1 task conversion")
+	fmt.Println("!!!!!validating v1 task")
+	return v1task.Validate(ctx)
+
+
+	//errs := validate.ObjectMetadata(t.GetObjectMeta()).ViaField("metadata")
+	//errs = errs.Also(t.Spec.Validate(apis.WithinSpec(ctx)).ViaField("spec"))
 	// When a Task is created directly, instead of declared inline in a TaskRun or PipelineRun,
 	// we do not support propagated parameters. Validate that all params it uses are declared.
-	return errs.Also(ValidateUsageOfDeclaredParameters(ctx, t.Spec.Steps, t.Spec.Params).ViaField("spec"))
+	//return errs.Also(ValidateUsageOfDeclaredParameters(ctx, t.Spec.Steps, t.Spec.Params).ViaField("spec"))
 }
 
 // Validate implements apis.Validatable

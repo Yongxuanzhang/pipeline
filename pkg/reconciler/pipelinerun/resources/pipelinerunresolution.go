@@ -582,7 +582,9 @@ func resolveTask(
 	if pipelineTask.TaskRef != nil {
 		// If the TaskRun has already a stored TaskSpec in its status, use it as source of truth
 		if taskRun != nil && taskRun.Status.TaskSpec != nil {
-			rt.TaskSpec = taskRun.Status.TaskSpec
+			internalts:=&pipeline.TaskSpec{}
+			v1.Convert_v1_TaskSpec_To_pipeline_TaskSpec(taskRun.Status.TaskSpec,internalts,nil )
+			rt.TaskSpec = internalts
 			rt.TaskName = pipelineTask.TaskRef.Name
 		} else {
 			// Following minimum status principle (TEP-0100), no need to propagate the RefSource about PipelineTask up to PipelineRun status.
@@ -605,7 +607,9 @@ func resolveTask(
 		}
 		rt.Kind = pipelineTask.TaskRef.Kind
 	} else {
-		rt.TaskSpec = &pipelineTask.TaskSpec.TaskSpec
+		internalts:=&pipeline.TaskSpec{}
+		v1.Convert_v1_TaskSpec_To_pipeline_TaskSpec(&pipelineTask.TaskSpec.TaskSpec,internalts,nil )
+		rt.TaskSpec = internalts
 	}
 	rt.TaskSpec.SetDefaults(ctx)
 	return rt, nil

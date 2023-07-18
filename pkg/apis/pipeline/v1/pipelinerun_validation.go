@@ -40,6 +40,8 @@ func (pr *PipelineRun) SupportedVerbs() []admissionregistrationv1.OperationType 
 
 // Validate pipelinerun
 func (pr *PipelineRun) Validate(ctx context.Context) *apis.FieldError {
+	fmt.Println("!!!!v1 pr validate")
+	fmt.Println("!!!!pr", pr)
 	errs := validate.ObjectMetadata(pr.GetObjectMeta()).ViaField("metadata")
 
 	if pr.IsPending() && pr.HasStarted() {

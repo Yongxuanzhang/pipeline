@@ -19,6 +19,7 @@ package resources
 import (
 	"fmt"
 
+	"github.com/tektoncd/pipeline/pkg/apis/pipeline"
 	v1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1"
 	"github.com/tektoncd/pipeline/pkg/list"
 	"github.com/tektoncd/pipeline/pkg/reconciler/taskrun"
@@ -78,7 +79,26 @@ func ValidateRequiredParametersProvided(pipelineParameters *v1.ParamSpecs, pipel
 
 // ValidateObjectParamRequiredKeys validates that the required keys of all the object parameters expected by the Pipeline are provided by the PipelineRun.
 func ValidateObjectParamRequiredKeys(pipelineParameters []v1.ParamSpec, pipelineRunParameters []v1.Param) error {
-	missings := taskrun.MissingKeysObjectParamNames(pipelineParameters, pipelineRunParameters)
+
+	internalPipelineParams:=[]pipeline.ParamSpec{}
+	for _, pps:= range pipelineParameters{
+		internalPipelineParam:= pipeline.ParamSpec{}
+		if err:=v1.Convert_v1_ParamSpec_To_pipeline_ParamSpec(&pps, &internalPipelineParam, nil);err!=nil{
+			return err
+		}
+		internalPipelineParams = append(internalPipelineParams, internalPipelineParam)
+	}
+
+	internalPipelineRunParams:=[]pipeline.Param{}
+	for _, prs:= range pipelineRunParameters{
+		internalPipelineRunParam:= pipeline.Param{}
+		if err:=v1.Convert_v1_Param_To_pipeline_Param(&prs, &internalPipelineRunParam, nil);err!=nil{
+			return err
+		}
+		internalPipelineRunParams = append(internalPipelineRunParams, internalPipelineRunParam)
+	}
+
+	missings := taskrun.MissingKeysObjectParamNames(internalPipelineParams, internalPipelineRunParams)
 	if len(missings) != 0 {
 		return fmt.Errorf("PipelineRun missing object keys for parameters: %v", missings)
 	}
@@ -116,5 +136,14 @@ func ValidateParameterTypesInMatrix(state PipelineRunState) error {
 // error is returned when the array indexing reference is out of bound of the array param
 // e.g. if a param reference of $(params.array-param[2]) and the array param is of length 2.
 func ValidateParamArrayIndex(ps *v1.PipelineSpec, params v1.Params) error {
-	return trresources.ValidateOutOfBoundArrayParams(ps.Params, params, ps.GetIndexingReferencesToArrayParams())
+
+	internalPipelineParams:=[]pipeline.ParamSpec{}
+	for _, pps:= range ps.Params{
+		internalPipelineParam:= pipeline.ParamSpec{}
+		if err:=v1.Convert_v1_ParamSpec_To_pipeline_ParamSpec(&pps, &internalPipelineParam, nil);err!=nil{
+			return err
+		}
+		internalPipelineParams = append(internalPipelineParams, internalPipelineParam)
+	}
+	return trresources.ValidateOutOfBoundArrayParams(internalPipelineParams, params, ps.GetIndexingReferencesToArrayParams())
 }

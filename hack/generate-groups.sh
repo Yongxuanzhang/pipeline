@@ -40,15 +40,16 @@ fi
 
 GENS="$1"
 OUTPUT_PKG="$2"
-APIS_PKG="$3"
-GROUPS_WITH_VERSIONS="$4"
+INT_APIS_PKG="$3"
+APIS_PKG="$4"
+GROUPS_WITH_VERSIONS="$5"
 shift 4
 
 (
   # To support running this script from anywhere, we have to first cd into this directory
   # so we can install the tools.
   cd "$(dirname "${0}")"
-  go install k8s.io/code-generator/cmd/{defaulter-gen,client-gen,lister-gen,informer-gen,deepcopy-gen}
+  go install k8s.io/code-generator/cmd/{defaulter-gen,client-gen,lister-gen,informer-gen,deepcopy-gen,conversion-gen}
 )
 
 PREFIX=${GOBIN:-${GOPATH}/bin}
@@ -56,19 +57,31 @@ PREFIX=${GOBIN:-${GOPATH}/bin}
 function codegen::join() { local IFS="$1"; shift; echo "$*"; }
 
 # enumerate group versions
+ALL_FQ_APIS=()
 FQ_APIS=() # e.g. k8s.io/api/apps/v1
 for GVs in ${GROUPS_WITH_VERSIONS}; do
   IFS=: read -r G Vs <<<"${GVs}"
-
+  if [ -n "${INT_APIS_PKG}" ]; then
+    ALL_FQ_APIS+=("${INT_APIS_PKG}/${G}")
+  fi
   # enumerate versions
   for V in ${Vs//,/ }; do
+    ALL_FQ_APIS+=("${APIS_PKG}/${G}/${V}")
     FQ_APIS+=("${APIS_PKG}/${G}/${V}")
   done
 done
 
+echo ${ALL_FQ_APIS[@]}
+echo ${FQ_APIS[@]}
+if [ "${GENS}" = "all" ] || grep -qw "conversion" <<<"${GENS}"; then
+  echo "Generating conversion funcs for ${GROUPS_WITH_VERSIONS}"
+  "${PREFIX}/conversion-gen" --input-dirs "$(codegen::join , "${ALL_FQ_APIS[@]}")" -O zz_generated.conversion  "$@"
+fi
+
 if [ "${GENS}" = "all" ] || grep -qw "deepcopy" <<<"${GENS}"; then
   echo "Generating deepcopy funcs for ${GROUPS_WITH_VERSIONS}"
-  "${PREFIX}/deepcopy-gen" --input-dirs "$(codegen::join , "${FQ_APIS[@]}")" -O zz_generated.deepcopy --bounding-dirs "${APIS_PKG}" "$@"
+  echo ${ALL_FQ_APIS[@]}
+  "${PREFIX}/deepcopy-gen" --input-dirs "$(codegen::join , "${ALL_FQ_APIS[@]}")" -O zz_generated.deepcopy "$@"
 fi
 
 if [ "${GENS}" = "all" ] || grep -qw "client" <<<"${GENS}"; then

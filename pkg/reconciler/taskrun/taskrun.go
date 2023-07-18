@@ -309,7 +309,7 @@ func (c *Reconciler) finishReconcileUpdateEmitEvents(ctx context.Context, tr *v1
 // `prepare` returns spec and resources. In future we might store
 // them in the TaskRun.Status so we don't need to re-run `prepare` at every
 // reconcile (see https://github.com/tektoncd/pipeline/issues/2473).
-func (c *Reconciler) prepare(ctx context.Context, tr *v1.TaskRun) (*v1.TaskSpec, *resources.ResolvedTask, error) {
+func (c *Reconciler) prepare(ctx context.Context, tr *v1.TaskRun) (*pipeline.TaskSpec, *resources.ResolvedTask, error) {
 	ctx, span := c.tracerProvider.Tracer(TracerName).Start(ctx, "prepare")
 	defer span.End()
 	logger := logging.FromContext(ctx)
@@ -381,7 +381,14 @@ func (c *Reconciler) prepare(ctx context.Context, tr *v1.TaskRun) (*v1.TaskSpec,
 		return nil, nil, controller.NewPermanentError(err)
 	}
 
-	if err := ValidateResolvedTask(ctx, tr.Spec.Params, &v1.Matrix{}, rtr); err != nil {
+	var internalparams []pipeline.Param
+	for _,p := range tr.Spec.Params{
+		var internalparam pipeline.Param
+		v1.Convert_v1_Param_To_pipeline_Param(&p,&internalparam,nil)
+		internalparams = append(internalparams, internalparam)
+	}
+
+	if err := ValidateResolvedTask(ctx, internalparams, &pipeline.Matrix{}, rtr); err != nil {
 		logger.Errorf("TaskRun %q resources are invalid: %v", tr.Name, err)
 		tr.Status.MarkResourceFailed(podconvert.ReasonFailedValidation, err)
 		return nil, nil, controller.NewPermanentError(err)
@@ -399,13 +406,13 @@ func (c *Reconciler) prepare(ctx context.Context, tr *v1.TaskRun) (*v1.TaskSpec,
 		return nil, nil, controller.NewPermanentError(err)
 	}
 
-	var workspaceDeclarations []v1.WorkspaceDeclaration
+	var workspaceDeclarations []pipeline.WorkspaceDeclaration
 	// Propagating workspaces allows users to skip declarations
 	// In order to validate the workspace bindings we create declarations based on
 	// the workspaces provided in the task run spec. We only allow this feature for embedded taskSpec.
 	if tr.Spec.TaskSpec != nil {
 		for _, ws := range tr.Spec.Workspaces {
-			wspaceDeclaration := v1.WorkspaceDeclaration{Name: ws.Name}
+			wspaceDeclaration := pipeline.WorkspaceDeclaration{Name: ws.Name}
 			workspaceDeclarations = append(workspaceDeclarations, wspaceDeclaration)
 		}
 		workspaceDeclarations = append(workspaceDeclarations, taskSpec.Workspaces...)
@@ -505,7 +512,10 @@ func (c *Reconciler) reconcile(ctx context.Context, tr *v1.TaskRun, rtr *resourc
 		logger.Errorf("Error updating task spec parameters, contexts, results and workspaces: %s", err)
 		return err
 	}
-	tr.Status.TaskSpec = ts
+
+	v1spec :=&v1.TaskSpec{}
+	v1.Convert_pipeline_TaskSpec_To_v1_TaskSpec(ts, v1spec, nil)
+	tr.Status.TaskSpec = v1spec
 
 	if len(tr.Status.TaskSpec.Steps) > 0 {
 		logger.Debugf("set taskspec for %s/%s - script: %s", tr.Namespace, tr.Name, tr.Status.TaskSpec.Steps[0].Script)
@@ -548,7 +558,7 @@ func (c *Reconciler) reconcile(ctx context.Context, tr *v1.TaskRun, rtr *resourc
 	return nil
 }
 
-func (c *Reconciler) updateTaskRunWithDefaultWorkspaces(ctx context.Context, tr *v1.TaskRun, taskSpec *v1.TaskSpec) error {
+func (c *Reconciler) updateTaskRunWithDefaultWorkspaces(ctx context.Context, tr *v1.TaskRun, taskSpec *pipeline.TaskSpec) error {
 	ctx, span := c.tracerProvider.Tracer(TracerName).Start(ctx, "updateTaskRunWithDefaultWorkspaces")
 	defer span.End()
 	configMap := config.FromContextOrDefaults(ctx)
@@ -704,14 +714,14 @@ func (c *Reconciler) failTaskRun(ctx context.Context, tr *v1.TaskRun, reason v1.
 
 // createPod creates a Pod based on the Task's configuration, with pvcName as a volumeMount
 // TODO(dibyom): Refactor resource setup/substitution logic to its own function in the resources package
-func (c *Reconciler) createPod(ctx context.Context, ts *v1.TaskSpec, tr *v1.TaskRun, rtr *resources.ResolvedTask, workspaceVolumes map[string]corev1.Volume) (*corev1.Pod, error) {
+func (c *Reconciler) createPod(ctx context.Context, ts *pipeline.TaskSpec, tr *v1.TaskRun, rtr *resources.ResolvedTask, workspaceVolumes map[string]corev1.Volume) (*corev1.Pod, error) {
 	ctx, span := c.tracerProvider.Tracer(TracerName).Start(ctx, "createPod")
 	defer span.End()
 	logger := logging.FromContext(ctx)
 
 	// By this time, params and workspaces should be propagated down so we can
 	// validate that all parameter variables and workspaces used in the TaskSpec are declared by the Task.
-	if validateErr := v1.ValidateUsageOfDeclaredParameters(ctx, ts.Steps, ts.Params); validateErr != nil {
+	if validateErr := pipeline.ValidateUsageOfDeclaredParameters(ctx, ts.Steps, ts.Params); validateErr != nil {
 		logger.Errorf("Failed to create a pod for taskrun: %s due to task validation error %v", tr.Name, validateErr)
 		return nil, validateErr
 	}
@@ -766,9 +776,9 @@ func (c *Reconciler) createPod(ctx context.Context, ts *v1.TaskSpec, tr *v1.Task
 }
 
 // applyParamsContextsResultsAndWorkspaces applies paramater, context, results and workspace substitutions to the TaskSpec.
-func applyParamsContextsResultsAndWorkspaces(ctx context.Context, tr *v1.TaskRun, rtr *resources.ResolvedTask, workspaceVolumes map[string]corev1.Volume) (*v1.TaskSpec, error) {
+func applyParamsContextsResultsAndWorkspaces(ctx context.Context, tr *v1.TaskRun, rtr *resources.ResolvedTask, workspaceVolumes map[string]corev1.Volume) (*pipeline.TaskSpec, error) {
 	ts := rtr.TaskSpec.DeepCopy()
-	var defaults []v1.ParamSpec
+	var defaults []pipeline.ParamSpec
 	if len(ts.Params) > 0 {
 		defaults = append(defaults, ts.Params...)
 	}
@@ -800,7 +810,7 @@ func applyParamsContextsResultsAndWorkspaces(ctx context.Context, tr *v1.TaskRun
 			}
 		}
 		if !skip {
-			ts.Workspaces = append(ts.Workspaces, v1.WorkspaceDeclaration{Name: trw.Name})
+			ts.Workspaces = append(ts.Workspaces, pipeline.WorkspaceDeclaration{Name: trw.Name})
 		}
 	}
 	ts = resources.ApplyWorkspaces(ctx, ts, ts.Workspaces, tr.Spec.Workspaces, workspaceVolumes)
@@ -879,10 +889,12 @@ func applyVolumeClaimTemplates(workspaceBindings []v1.WorkspaceBinding, owner me
 	return taskRunWorkspaceBindings
 }
 
-func storeTaskSpecAndMergeMeta(ctx context.Context, tr *v1.TaskRun, ts *v1.TaskSpec, meta *resolutionutil.ResolvedObjectMeta) error {
+func storeTaskSpecAndMergeMeta(ctx context.Context, tr *v1.TaskRun, ts *pipeline.TaskSpec, meta *resolutionutil.ResolvedObjectMeta) error {
 	// Only store the TaskSpec once, if it has never been set before.
 	if tr.Status.TaskSpec == nil {
-		tr.Status.TaskSpec = ts
+		v1ts :=&v1.TaskSpec{}
+		v1.Convert_pipeline_TaskSpec_To_v1_TaskSpec(ts, v1ts, nil)
+		tr.Status.TaskSpec = v1ts
 		if meta == nil {
 			return nil
 		}

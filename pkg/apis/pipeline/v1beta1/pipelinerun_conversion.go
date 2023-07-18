@@ -30,6 +30,7 @@ var _ apis.Convertible = (*PipelineRun)(nil)
 
 // ConvertTo implements apis.Convertible
 func (pr *PipelineRun) ConvertTo(ctx context.Context, to apis.Convertible) error {
+	fmt.Println("!!!!pr ConvertTo")
 	if apis.IsInDelete(ctx) {
 		return nil
 	}
@@ -93,6 +94,7 @@ func (prs PipelineRunSpec) ConvertTo(ctx context.Context, sink *v1.PipelineRunSp
 
 // ConvertFrom implements apis.Convertible
 func (pr *PipelineRun) ConvertFrom(ctx context.Context, from apis.Convertible) error {
+	fmt.Println("!!!!pr ConvertFrom")
 	switch source := from.(type) {
 	case *v1.PipelineRun:
 		pr.ObjectMeta = source.ObjectMeta

@@ -1,0 +1,33 @@
+apiVersion: tekton.dev/v1
+kind: PipelineRun
+metadata:
+  generateName: sum-pr-
+spec:
+  pipelineSpec:
+    tasks:
+      - name: write-a
+        taskSpec:
+          results:
+            - name: resulta
+          steps:
+            - name: write-new-stuff
+              image: ubuntu
+              script: |
+                echo "1" | tee $(results.resulta.path)
+      - name: write-b
+        taskSpec:
+          results:
+            - name: resultb
+          steps:
+            - name: write-new-stuff
+              image: ubuntu
+              script: |
+                echo "2" | tee $(results.resultb.path)
+      - name: execute-when-sum-is-3
+        when:
+          - cel: "$(tasks.write-a.results.resulta) + $(tasks.write-b.results.resultb) == 3"
+        taskSpec:
+          steps:
+            - name: echo
+              image: ubuntu
+              script: 'echo "3"'

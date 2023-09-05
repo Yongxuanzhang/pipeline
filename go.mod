@@ -8,6 +8,7 @@ require (
 	github.com/cloudevents/sdk-go/v2 v2.14.0
 	github.com/containerd/containerd v1.7.3
 	github.com/go-git/go-git/v5 v5.8.1
+	github.com/google/cel-go v0.12.6
 	github.com/google/go-cmp v0.5.9
 	github.com/google/go-containerregistry v0.16.1
 	github.com/google/uuid v1.3.0
@@ -87,6 +88,7 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/security/keyvault/azkeys v0.12.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/security/keyvault/internal v0.8.0 // indirect
 	github.com/AzureAD/microsoft-authentication-library-for-go v1.0.0 // indirect
+	github.com/antlr/antlr4/runtime/Go/antlr v1.4.10 // indirect
 	github.com/aws/aws-sdk-go-v2/service/kms v1.22.2 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.14.12 // indirect
 	github.com/cenkalti/backoff/v3 v3.2.2 // indirect
@@ -120,6 +122,7 @@ require (
 	github.com/pkg/browser v0.0.0-20210911075715-681adbf594b8 // indirect
 	github.com/ryanuber/go-glob v1.0.0 // indirect
 	github.com/skeema/knownhosts v1.2.0 // indirect
+	github.com/stoewer/go-strcase v1.2.0 // indirect
 	github.com/theupdateframework/go-tuf v0.5.2 // indirect
 	github.com/titanous/rocacheck v0.0.0-20171023193734-afe73141d399 // indirect
 	github.com/zeebo/errs v1.3.0 // indirect

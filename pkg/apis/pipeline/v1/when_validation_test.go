@@ -29,6 +29,14 @@ func TestWhenExpressions_Valid(t *testing.T) {
 	}{{
 		name: "valid operator - In - and values",
 		wes: []WhenExpression{{
+			CEL: `"apple" in ["apple", "banana", "orange"]`,
+			Input:    "$(params.path)",
+			Operator: selection.In,
+			Values:   []string{"README.md"},
+		}},
+	},{
+		name: "valid operator - In - and values",
+		wes: []WhenExpression{{
 			Input:    "foo",
 			Operator: selection.In,
 			Values:   []string{"foo"},

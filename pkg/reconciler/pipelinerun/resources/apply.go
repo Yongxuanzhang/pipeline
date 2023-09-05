@@ -186,6 +186,7 @@ func ApplyTaskResults(targets PipelineRunState, resolvedResultRefs ResolvedResul
 					pipelineTask.Matrix.Include[i].Params = pipelineTask.Matrix.Include[i].Params.ReplaceVariables(stringReplacements, nil, nil)
 				}
 			}
+			fmt.Println("!!!!ApplyTaskResults stringReplacements", stringReplacements)
 			pipelineTask.When = pipelineTask.When.ReplaceVariables(stringReplacements, arrayReplacements)
 			if pipelineTask.TaskRef != nil && pipelineTask.TaskRef.Params != nil {
 				pipelineTask.TaskRef.Params = pipelineTask.TaskRef.Params.ReplaceVariables(stringReplacements, arrayReplacements, objectReplacements)

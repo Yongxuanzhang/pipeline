@@ -306,6 +306,7 @@ func (t *ResolvedPipelineTask) Skip(facts *PipelineRunFacts) TaskSkipStatus {
 // skipBecauseWhenExpressionsEvaluatedToFalse confirms that the when expressions have completed evaluating, and
 // it returns true if any of the when expressions evaluate to false
 func (t *ResolvedPipelineTask) skipBecauseWhenExpressionsEvaluatedToFalse(facts *PipelineRunFacts) bool {
+	fmt.Println("!!!facts.State.GetTaskRunsResults()",facts.State.GetTaskRunsResults())
 	if t.checkParentsDone(facts) {
 		if !t.PipelineTask.When.AllowsExecution() {
 			return true

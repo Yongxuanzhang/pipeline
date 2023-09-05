@@ -32,6 +32,27 @@ var validWhenOperators = []string{
 }
 
 func (wes WhenExpressions) validate() *apis.FieldError {
+	/*
+	if len(wes)>0 && wes[0].Input=="$(params.path)"{
+		fmt.Println("!!!!wes.CEL",wes[0].CEL)
+		if wes[0].CEL!=""{
+			fmt.Println("!!!!wes.CEL 1")
+			env, err := cel.NewEnv(cel.Declarations())
+			if err != nil {
+				return nil
+			}
+			fmt.Println("!!!!wes.CEL 2")
+			fmt.Println("!!!!wes[0].CEL", wes[0].CEL)
+			ast, _ := env.Compile(wes[0].CEL)
+			fmt.Println("!!!!wes.CEL 3")
+			fmt.Println("!!!!wes.CEL ast", ast)
+			prg, _ := env.Program(ast)
+			fmt.Println("!!!!wes.CEL 4")
+			out, _, err := prg.Eval(map[string]interface{}{})
+			fmt.Println("!!!!wes.CEL 5")
+			fmt.Println("!!!!out",out)
+		}
+	}*/
 	return wes.validateWhenExpressionsFields().ViaField("when")
 }
 
@@ -43,6 +64,9 @@ func (wes WhenExpressions) validateWhenExpressionsFields() (errs *apis.FieldErro
 }
 
 func (we *WhenExpression) validateWhenExpressionFields() *apis.FieldError {
+	if we.CEL!=""{
+		return nil
+	}
 	if equality.Semantic.DeepEqual(we, &WhenExpression{}) || we == nil {
 		return apis.ErrMissingField(apis.CurrentField)
 	}

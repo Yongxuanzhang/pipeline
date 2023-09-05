@@ -5604,6 +5604,16 @@ k8s.io/apimachinery/pkg/selection.Operator
 It must be non-empty</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>expression</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="tekton.dev/v1.WhenExpressions">WhenExpressions

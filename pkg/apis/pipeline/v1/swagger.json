@@ -2206,9 +2206,14 @@
       "required": [
         "input",
         "operator",
-        "values"
+        "values",
+        "expression"
       ],
       "properties": {
+        "expression": {
+          "type": "string",
+          "default": ""
+        },
         "input": {
           "description": "Input is the string for guard checking which can be a static input or an output from a parent Task",
           "type": "string",

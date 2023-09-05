@@ -19,6 +19,8 @@ package v1
 import (
 	"fmt"
 
+	"github.com/google/cel-go/cel"
+	"github.com/google/cel-go/common/types"
 	"github.com/tektoncd/pipeline/pkg/substitution"
 	"k8s.io/apimachinery/pkg/selection"
 )
@@ -36,6 +38,8 @@ type WhenExpression struct {
 	// It must be non-empty
 	// +listType=atomic
 	Values []string `json:"values"`
+
+	CEL string `json:"cel"`
 }
 
 func (we *WhenExpression) isInputInValues() bool {
@@ -48,6 +52,30 @@ func (we *WhenExpression) isInputInValues() bool {
 }
 
 func (we *WhenExpression) isTrue() bool {
+	//we.CEL
+	if we.CEL!=""{
+		env, err := cel.NewEnv(cel.Declarations())
+		if err != nil {
+			return false
+		}
+		ast, iss := env.Compile(we.CEL)
+		fmt.Println("!!!!ast",ast)
+		if iss.Err() != nil {
+			fmt.Println("CEL expression could not be parsed", iss.Err())
+			return false
+		}
+		prg, _ := env.Program(ast)
+		fmt.Println("!!!!prg",prg)
+		out, _, err := prg.Eval(map[string]interface{}{})
+		fmt.Println("!!!!out", out)
+		if out.ConvertToType(types.StringType).Value()=="true"{
+			fmt.Println("!!!!I'm true")
+			return true
+		}else{
+			return false
+		}
+	}
+
 	if we.Operator == selection.In {
 		return we.isInputInValues()
 	}
@@ -57,7 +85,7 @@ func (we *WhenExpression) isTrue() bool {
 
 func (we *WhenExpression) applyReplacements(replacements map[string]string, arrayReplacements map[string][]string) WhenExpression {
 	replacedInput := substitution.ApplyReplacements(we.Input, replacements)
-
+	replacedCEL := substitution.ApplyReplacements(we.CEL, replacements)
 	var replacedValues []string
 	for _, val := range we.Values {
 		// arrayReplacements holds a list of array parameters with a pattern - params.arrayParam1
@@ -73,13 +101,14 @@ func (we *WhenExpression) applyReplacements(replacements map[string]string, arra
 		}
 	}
 
-	return WhenExpression{Input: replacedInput, Operator: we.Operator, Values: replacedValues}
+	return WhenExpression{Input: replacedInput, Operator: we.Operator, Values: replacedValues, CEL: replacedCEL}
 }
 
 // GetVarSubstitutionExpressions extracts all the values between "$(" and ")" in a When Expression
 func (we *WhenExpression) GetVarSubstitutionExpressions() ([]string, bool) {
 	var allExpressions []string
 	allExpressions = append(allExpressions, validateString(we.Input)...)
+	allExpressions = append(allExpressions, validateString(we.CEL)...)
 	for _, value := range we.Values {
 		allExpressions = append(allExpressions, validateString(value)...)
 	}

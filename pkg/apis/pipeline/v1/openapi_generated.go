@@ -4294,8 +4294,15 @@ func schema_pkg_apis_pipeline_v1_WhenExpression(ref common.ReferenceCallback) co
 							},
 						},
 					},
+					"expression": {
+						SchemaProps: spec.SchemaProps{
+							Default: "",
+							Type:    []string{"string"},
+							Format:  "",
+						},
+					},
 				},
-				Required: []string{"input", "operator", "values"},
+				Required: []string{"input", "operator", "values", "expression"},
 			},
 		},
 	}

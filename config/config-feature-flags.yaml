@@ -121,3 +121,5 @@ data:
   # Setting this flag to "true" will keep pod on cancellation
   # allowing examination of the logs on the pods from cancelled taskruns
   keep-pod-on-cancel: "false"
+  # Setting this flag to "true" will enable the CEL evaluation in WhenExpression
+  enable-cel-in-whenexpression: "false"

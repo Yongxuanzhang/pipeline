@@ -766,6 +766,15 @@ func (c *Reconciler) runNextSchedulableTask(ctx context.Context, pr *v1.Pipeline
 	recorder := controller.GetEventRecorder(ctx)
 
 	// nextRpts holds a list of pipeline tasks which should be executed next
+	for _, rpt := range pipelineRunFacts.State {
+		err := rpt.EvaluateCEL()
+		if err != nil {
+			logger.Errorf("Error evaluating CEL %s: %v", pr.Name, err)
+			pr.Status.MarkFailed("invalid cel", err.Error())
+			return controller.NewPermanentError(err)
+		}
+	}
+
 	nextRpts, err := pipelineRunFacts.DAGExecutionQueue()
 	if err != nil {
 		logger.Errorf("Error getting potential next tasks for valid pipelinerun %s: %v", pr.Name, err)
@@ -803,7 +812,6 @@ func (c *Reconciler) runNextSchedulableTask(ctx context.Context, pr *v1.Pipeline
 		if rpt.IsFinalTask(pipelineRunFacts) {
 			c.setFinallyStartedTimeIfNeeded(pr, pipelineRunFacts)
 		}
-
 		if rpt == nil || rpt.Skip(pipelineRunFacts).IsSkipped || rpt.IsFinallySkipped(pipelineRunFacts).IsSkipped {
 			continue
 		}

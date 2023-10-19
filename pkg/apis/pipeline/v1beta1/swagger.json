@@ -3117,6 +3117,10 @@
         "values"
       ],
       "properties": {
+        "cel": {
+          "description": "CEL is a string of Common Language Expression, which can be used to conditionally execute the task based on the result of the expression evaluation More info about CEL syntax: https://github.com/google/cel-spec/blob/master/doc/langdef.md",
+          "type": "string"
+        },
         "input": {
           "description": "Input is the string for guard checking which can be a static input or an output from a parent Task",
           "type": "string",

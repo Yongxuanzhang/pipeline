@@ -22,6 +22,8 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/google/cel-go/cel"
+	"github.com/google/cel-go/common/types"
 	"github.com/tektoncd/pipeline/pkg/apis/config"
 	"github.com/tektoncd/pipeline/pkg/apis/pipeline"
 	v1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1"
@@ -66,6 +68,36 @@ type ResolvedPipelineTask struct {
 	PipelineTask   *v1.PipelineTask
 	ResolvedTask   *resources.ResolvedTask
 	ResultsCache   map[string][]string
+	EvaluatedCEL   map[string]bool
+}
+
+// isDone returns true only if the task is skipped, succeeded or failed
+func (t *ResolvedPipelineTask) EvaluateCEL() error {
+	if t.PipelineTask != nil {
+		for _, we := range t.PipelineTask.When {
+			if we.CEL != "" {
+				env, err := cel.NewEnv(cel.Declarations())
+				if err != nil {
+					return err
+				}
+				ast, iss := env.Compile(we.CEL)
+				if iss.Err() != nil {
+					return iss.Err()
+				}
+				prg, _ := env.Program(ast)
+				out, _, _ := prg.Eval(map[string]interface{}{})
+				if len(t.EvaluatedCEL) == 0 {
+					t.EvaluatedCEL = make(map[string]bool)
+				}
+				if out.ConvertToType(types.BoolType).Value() == true {
+					t.EvaluatedCEL[we.CEL] = true
+				} else {
+					t.EvaluatedCEL[we.CEL] = false
+				}
+			}
+		}
+	}
+	return nil
 }
 
 // isDone returns true only if the task is skipped, succeeded or failed
@@ -257,7 +289,6 @@ func (t *ResolvedPipelineTask) checkParentsDone(facts *PipelineRunFacts) bool {
 
 func (t *ResolvedPipelineTask) skip(facts *PipelineRunFacts) TaskSkipStatus {
 	var skippingReason v1.SkippingReason
-
 	switch {
 	case facts.isFinalTask(t.PipelineTask.Name) || t.isScheduled():
 		skippingReason = v1.None
@@ -271,6 +302,8 @@ func (t *ResolvedPipelineTask) skip(facts *PipelineRunFacts) TaskSkipStatus {
 		skippingReason = v1.ParentTasksSkip
 	case t.skipBecauseResultReferencesAreMissing(facts):
 		skippingReason = v1.MissingResultsSkip
+	case t.skipBecauseCELExpressionsEvaluatedToFalse(facts):
+		skippingReason = v1.WhenExpressionsSkip
 	case t.skipBecauseWhenExpressionsEvaluatedToFalse(facts):
 		skippingReason = v1.WhenExpressionsSkip
 	case t.skipBecausePipelineRunPipelineTimeoutReached(facts):
@@ -303,6 +336,20 @@ func (t *ResolvedPipelineTask) Skip(facts *PipelineRunFacts) TaskSkipStatus {
 		facts.SkipCache[t.PipelineTask.Name] = t.skip(facts)
 	}
 	return facts.SkipCache[t.PipelineTask.Name]
+}
+
+// skipBecauseWhenExpressionsEvaluatedToFalse confirms that the when expressions have completed evaluating, and
+// it returns true if any of the when expressions evaluate to false
+func (t *ResolvedPipelineTask) skipBecauseCELExpressionsEvaluatedToFalse(facts *PipelineRunFacts) bool {
+	if t.checkParentsDone(facts) {
+		for _, we := range t.PipelineTask.When {
+			if we.CEL != "" && !t.EvaluatedCEL[we.CEL] {
+				return true
+			}
+		}
+		return false
+	}
+	return false
 }
 
 // skipBecauseWhenExpressionsEvaluatedToFalse confirms that the when expressions have completed evaluating, and
@@ -424,6 +471,8 @@ func (t *ResolvedPipelineTask) IsFinallySkipped(facts *PipelineRunFacts) TaskSki
 		switch {
 		case t.skipBecauseResultReferencesAreMissing(facts):
 			skippingReason = v1.MissingResultsSkip
+		case t.skipBecauseCELExpressionsEvaluatedToFalse(facts):
+			skippingReason = v1.WhenExpressionsSkip
 		case t.skipBecauseWhenExpressionsEvaluatedToFalse(facts):
 			skippingReason = v1.WhenExpressionsSkip
 		case t.skipBecausePipelineRunPipelineTimeoutReached(facts):

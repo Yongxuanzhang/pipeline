@@ -32,3 +32,4 @@ data:
   enable-provenance-in-status: "false"
   set-security-context: "true"
   keep-pod-on-cancel: "true"
+  enable-cel-in-whenexpression: "true"

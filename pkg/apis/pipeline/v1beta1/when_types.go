@@ -36,6 +36,12 @@ type WhenExpression struct {
 	// It must be non-empty
 	// +listType=atomic
 	Values []string `json:"values"`
+
+	// CEL is a string of Common Language Expression, which can be used to conditionally execute
+	// the task based on the result of the expression evaluation
+	// More info about CEL syntax: https://github.com/google/cel-spec/blob/master/doc/langdef.md
+	// +optional
+	CEL string `json:"cel,omitempty"`
 }
 
 func (we *WhenExpression) isInputInValues() bool {
@@ -57,7 +63,6 @@ func (we *WhenExpression) isTrue() bool {
 
 func (we *WhenExpression) applyReplacements(replacements map[string]string, arrayReplacements map[string][]string) WhenExpression {
 	replacedInput := substitution.ApplyReplacements(we.Input, replacements)
-
 	var replacedValues []string
 	for _, val := range we.Values {
 		// arrayReplacements holds a list of array parameters with a pattern - params.arrayParam1

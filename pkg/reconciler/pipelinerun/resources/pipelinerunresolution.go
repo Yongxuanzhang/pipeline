@@ -257,7 +257,6 @@ func (t *ResolvedPipelineTask) checkParentsDone(facts *PipelineRunFacts) bool {
 
 func (t *ResolvedPipelineTask) skip(facts *PipelineRunFacts) TaskSkipStatus {
 	var skippingReason v1.SkippingReason
-
 	switch {
 	case facts.isFinalTask(t.PipelineTask.Name) || t.isScheduled():
 		skippingReason = v1.None

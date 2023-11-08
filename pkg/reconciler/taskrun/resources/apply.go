@@ -52,11 +52,26 @@ func ApplyParameters(ctx context.Context, spec *v1.TaskSpec, tr *v1.TaskRun, def
 
 	// stringReplacements is used for standard single-string stringReplacements, while arrayReplacements contains arrays
 	// that need to be further processed.
+	stringReplacements, arrayReplacements := paramsFromParamSpecs(defaults)
+
+	// Set and overwrite params with the ones from the TaskRun
+	trStrings, trArrays := paramsFromParams(tr.Spec.Params)
+	for k, v := range trStrings {
+		stringReplacements[k] = v
+	}
+	for k, v := range trArrays {
+		arrayReplacements[k] = v
+	}
+
+	return ApplyReplacements(spec, stringReplacements, arrayReplacements)
+}
+
+func paramsFromParamSpecs(paramSpecs v1.ParamSpecs) (map[string]string, map[string][]string) {
 	stringReplacements := map[string]string{}
 	arrayReplacements := map[string][]string{}
 
 	// Set all the default stringReplacements
-	for _, p := range defaults {
+	for _, p := range paramSpecs {
 		if p.Default != nil {
 			switch p.Default.Type {
 			case v1.ParamTypeArray:
@@ -79,25 +94,16 @@ func ApplyParameters(ctx context.Context, spec *v1.TaskSpec, tr *v1.TaskRun, def
 			}
 		}
 	}
-	// Set and overwrite params with the ones from the TaskRun
-	trStrings, trArrays := paramsFromTaskRun(ctx, tr)
-	for k, v := range trStrings {
-		stringReplacements[k] = v
-	}
-	for k, v := range trArrays {
-		arrayReplacements[k] = v
-	}
-
-	return ApplyReplacements(spec, stringReplacements, arrayReplacements)
+	return stringReplacements, arrayReplacements
 }
 
-func paramsFromTaskRun(ctx context.Context, tr *v1.TaskRun) (map[string]string, map[string][]string) {
+func paramsFromParams(params v1.Params) (map[string]string, map[string][]string) {
 	// stringReplacements is used for standard single-string stringReplacements, while arrayReplacements contains arrays
 	// that need to be further processed.
 	stringReplacements := map[string]string{}
 	arrayReplacements := map[string][]string{}
 
-	for _, p := range tr.Spec.Params {
+	for _, p := range params {
 		switch p.Value.Type {
 		case v1.ParamTypeArray:
 			for _, pattern := range paramPatterns {

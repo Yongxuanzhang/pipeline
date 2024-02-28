@@ -6,7 +6,6 @@ import (
 	"context"
 	"fmt"
 	awsmiddleware "github.com/aws/aws-sdk-go-v2/aws/middleware"
-	"github.com/aws/aws-sdk-go-v2/aws/signer/v4"
 	"github.com/aws/aws-sdk-go-v2/service/kms/types"
 	"github.com/aws/smithy-go/middleware"
 	smithyhttp "github.com/aws/smithy-go/transport/http"
@@ -59,10 +58,10 @@ import (
 // operation in the replica key's Region. If you replicate a multi-Region primary
 // key with imported key material, the replica key is created with no key material.
 // You must import the same key material that you imported into the primary key.
-// For details, see Importing key material into multi-Region keys in the Key
-// Management Service Developer Guide. To convert a replica key to a primary key,
-// use the UpdatePrimaryRegion operation. ReplicateKey uses different default
-// values for the KeyPolicy and Tags parameters than those used in the KMS
+// For details, see Importing key material into multi-Region keys (https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-import.html)
+// in the Key Management Service Developer Guide. To convert a replica key to a
+// primary key, use the UpdatePrimaryRegion operation. ReplicateKey uses different
+// default values for the KeyPolicy and Tags parameters than those used in the KMS
 // console. For details, see the parameter descriptions. Cross-account use: No. You
 // cannot use this operation to create a replica key in a different Amazon Web
 // Services account. Required permissions:
@@ -75,6 +74,10 @@ import (
 // Related operations
 //   - CreateKey
 //   - UpdatePrimaryRegion
+//
+// Eventual consistency: The KMS API follows an eventual consistency model. For
+// more information, see KMS eventual consistency (https://docs.aws.amazon.com/kms/latest/developerguide/programming-eventual-consistency.html)
+// .
 func (c *Client) ReplicateKey(ctx context.Context, params *ReplicateKeyInput, optFns ...func(*Options)) (*ReplicateKeyOutput, error) {
 	if params == nil {
 		params = &ReplicateKeyInput{}
@@ -132,7 +135,8 @@ type ReplicateKeyInput struct {
 	// information, see Default key policy (https://docs.aws.amazon.com/kms/latest/developerguide/key-policy-default.html#prevent-unmanageable-key)
 	// in the Key Management Service Developer Guide. Use this parameter only when you
 	// intend to prevent the principal that is making the request from making a
-	// subsequent PutKeyPolicy request on the KMS key.
+	// subsequent PutKeyPolicy (https://docs.aws.amazon.com/kms/latest/APIReference/API_PutKeyPolicy.html)
+	// request on the KMS key.
 	BypassPolicyLockoutSafetyCheck bool
 
 	// A description of the KMS key. The default value is an empty string (no
@@ -244,25 +248,25 @@ func (c *Client) addOperationReplicateKeyMiddlewares(stack *middleware.Stack, op
 	if err = addSetLoggerMiddleware(stack, options); err != nil {
 		return err
 	}
-	if err = awsmiddleware.AddClientRequestIDMiddleware(stack); err != nil {
+	if err = addClientRequestID(stack); err != nil {
 		return err
 	}
-	if err = smithyhttp.AddComputeContentLengthMiddleware(stack); err != nil {
+	if err = addComputeContentLength(stack); err != nil {
 		return err
 	}
 	if err = addResolveEndpointMiddleware(stack, options); err != nil {
 		return err
 	}
-	if err = v4.AddComputePayloadSHA256Middleware(stack); err != nil {
+	if err = addComputePayloadSHA256(stack); err != nil {
 		return err
 	}
-	if err = addRetryMiddlewares(stack, options); err != nil {
+	if err = addRetry(stack, options); err != nil {
 		return err
 	}
-	if err = awsmiddleware.AddRawResponseToMetadata(stack); err != nil {
+	if err = addRawResponseToMetadata(stack); err != nil {
 		return err
 	}
-	if err = awsmiddleware.AddRecordResponseTiming(stack); err != nil {
+	if err = addRecordResponseTiming(stack); err != nil {
 		return err
 	}
 	if err = addClientUserAgent(stack, options); err != nil {
@@ -283,7 +287,7 @@ func (c *Client) addOperationReplicateKeyMiddlewares(stack *middleware.Stack, op
 	if err = stack.Initialize.Add(newServiceMetadataMiddleware_opReplicateKey(options.Region), middleware.Before); err != nil {
 		return err
 	}
-	if err = awsmiddleware.AddRecursionDetection(stack); err != nil {
+	if err = addRecursionDetection(stack); err != nil {
 		return err
 	}
 	if err = addRequestIDRetrieverMiddleware(stack); err != nil {

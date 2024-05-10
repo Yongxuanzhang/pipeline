@@ -455,11 +455,11 @@ func TestPipelineTask_ValidateCustomTask(t *testing.T) {
 		task          PipelineTask
 		expectedError apis.FieldError
 	}{{
-		name: "custom task - taskRef without kind",
+		name: "custom task - taskRef without customTask",
 		task: PipelineTask{Name: "foo", TaskRef: &TaskRef{APIVersion: "example.dev/v0", Kind: "", Name: ""}},
 		expectedError: apis.FieldError{
-			Message: `invalid value: custom task ref must specify kind`,
-			Paths:   []string{"taskRef.kind"},
+			Message: `invalid value: custom task ref must specify customTask`,
+			Paths:   []string{"taskRef.customTask"},
 		},
 	}, {
 		name: "custom task - taskSpec without kind",
@@ -658,8 +658,8 @@ func TestPipelineTask_Validate_Failure(t *testing.T) {
 			TaskRef: &TaskRef{APIVersion: "example.com"},
 		},
 		expectedError: apis.FieldError{
-			Message: `invalid value: custom task ref must specify kind`,
-			Paths:   []string{"taskRef.kind"},
+			Message: `invalid value: custom task ref must specify customTask`,
+			Paths:   []string{"taskRef.customTask"},
 		},
 	}, {
 		name: "custom task reference in taskspec missing kind",
